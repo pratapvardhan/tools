@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>World Time</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 540px;
+            margin: 1rem auto;
+            padding: 1rem;
+        }
+
+        .local-time {
+            background: white;
+            padding: 1rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            margin-bottom: 2rem;
+        }
+
+        .local-time-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .clock, .time {
+            font-variant-numeric: tabular-nums;
+            font-size: 1rem;
+        }
+
+        .clock {
+            font-size: 2rem;
+            font-weight: bold;
+        }
+
+        .timezone-list {
+            display: grid;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .timezone-item {
+            background: white;
+            padding: 1rem;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: relative;
+        }
+
+        .timezone-info {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+        }
+
+        .add-timezone {
+            position: relative;
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+        }
+
+        input {
+            flex: 1;
+            min-width: 200px;
+            padding: 0.5rem;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 1rem;
+        }
+
+        button {
+            padding: 0.5rem 1rem;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+
+        button:hover {
+            background: #0056b3;
+        }
+
+        .remove-btn {
+            background: none;
+            font-size: 0.85rem;
+            position: absolute;
+            color: #555;
+            right: -2.25rem;
+            font-weight: bold;
+        }
+
+        .remove-btn:hover {
+            color: #c82333;
+            background: none;
+        }
+
+        .suggestions {
+            position: absolute;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            max-height: 200px;
+            overflow-y: auto;
+            width: 100%;
+            display: none;
+            margin-top: 40px;
+        }
+
+        .suggestion-item {
+            padding: 0.5rem;
+            cursor: pointer;
+        }
+
+        .suggestion-item:hover {
+            background: #f0f0f0;
+        }
+
+        .timezone-info h3 {
+            display: flex;
+            align-items: baseline;
+            gap: 0.25rem;
+        }
+
+        .timezone-region {
+            font-size: 0.75rem;
+            color: #999;
+            font-weight: normal;
+        }
+
+        .copy-url {
+            margin-top: 2rem;
+            text-align: right;
+        }
+
+        .copy-url button {
+            padding: 0.5rem 1rem;
+            background: white;
+            color: #666;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+
+        .copy-url button:hover {
+            background: #f8f8f8;
+            color: #333;
+        }
+
+        .time {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .time-offset {
+            color: #666;
+            font-size: 0.85rem;
+        }
+
+        .time span:last-child {
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+
+        <div class="local-time">
+            <div class="local-time-info">
+                <h3>Local Time</h3>
+                <div id="local-clock" class="clock"></div>
+            </div>
+        </div>
+        <div class="timezone-list" id="timezone-list"></div>
+        <div class="add-timezone">
+            <input type="text" id="timezone-search" placeholder="Search and add a city / timezone...">
+            <div id="suggestions" class="suggestions"></div>
+            <button id="add-timezone">Add Timezone</button>
+        </div>
+        <div class="copy-url">
+            <button id="copy-url">Copy URL</button>
+        </div>
+    </div>
+    <script>
+        class WorldTime {
+            constructor() {
+                const urlParams = new URLSearchParams(window.location.search);
+                const urlTimezones = urlParams.get('timezones')?.split(',').filter(tz => tz);
+                const defaultTimezones = ['America/Los_Angeles', 'America/New_York', 'Europe/London', 'Asia/Kolkata'];
+
+                try {
+                    this.timezones = urlTimezones || JSON.parse(localStorage.getItem('tools.timezones')) || defaultTimezones;
+                    localStorage.setItem('tools.timezones', JSON.stringify(this.timezones));
+                } catch (e) {
+                    this.timezones = urlTimezones || defaultTimezones;
+                }
+
+                this.availableTimezones = Intl.supportedValuesOf('timeZone');
+                this.elements = {
+                    localClock: document.getElementById('local-clock'),
+                    timezoneList: document.getElementById('timezone-list'),
+                    timezoneSearch: document.getElementById('timezone-search'),
+                    suggestions: document.getElementById('suggestions')
+                };
+
+                this.init();
+            }
+
+            init() {
+                this.updateTimes();
+                this.renderTimezones();
+                this.setupEventListeners();
+                setInterval(() => this.updateTimes(), 1000);
+            }
+
+            updateTimes() {
+                this.elements.localClock.textContent = new Date().toLocaleTimeString();
+                this.timezones.forEach(timezone => {
+                    const timeElement = document.querySelector(`[data-timezone="${timezone}"]`);
+                    if (timeElement) {
+                        timeElement.innerHTML = this.formatTime(timezone);
+                    }
+                });
+            }
+
+            formatTime(timezone) {
+                const now = new Date();
+                const tzTime = new Date(now.toLocaleString('en-US', { timeZone: timezone }));
+                const offsetHours = ((tzTime - now) / (1000 * 60 * 60)).toFixed(1);
+                const offset = offsetHours === '0.0' ? '' : `${offsetHours > 0 ? '+' : ''}${offsetHours}h`;
+
+                return `
+                    ${offset ? `<span class="time-offset">${offset}</span>` : ''}
+                    <span>${now.toLocaleString('en-US', { timeZone: timezone, hour: '2-digit', minute: '2-digit', hour12: true })}</span>
+                `;
+            }
+
+            renderTimezones() {
+                this.elements.timezoneList.innerHTML = this.timezones
+                    .map((timezone, index) => {
+                        const [region, city] = timezone.split('/');
+                        return `
+                            <div class="timezone-item">
+                                <div class="timezone-info">
+                                    <h3>${city.replace('_', ' ')}<span class="timezone-region">${region}</span></h3>
+                                    <div class="time" data-timezone="${timezone}">${this.formatTime(timezone)}</div>
+                                </div>
+                                <button class="remove-btn" data-index="${index}">x</button>
+                            </div>
+                        `;
+                    }).join('');
+            }
+
+            setupEventListeners() {
+                document.getElementById('timezone-search').addEventListener('input', () => 
+                    this.showSuggestions(this.elements.timezoneSearch.value.trim().toLowerCase()));
+                
+                document.getElementById('suggestions').addEventListener('click', e => {
+                    if (e.target.classList.contains('suggestion-item')) {
+                        this.elements.timezoneSearch.value = e.target.textContent;
+                        this.elements.suggestions.style.display = 'none';
+                    }
+                });
+
+                document.getElementById('add-timezone').addEventListener('click', () => 
+                    this.addTimezone(this.elements.timezoneSearch.value.trim()));
+
+                document.getElementById('copy-url').addEventListener('click', () => this.copyUrlToClipboard());
+
+                document.addEventListener('click', e => {
+                    if (!this.elements.timezoneSearch.contains(e.target) && !this.elements.suggestions.contains(e.target)) {
+                        this.elements.suggestions.style.display = 'none';
+                    }
+                });
+
+                this.elements.timezoneList.addEventListener('click', e => {
+                    if (e.target.classList.contains('remove-btn')) {
+                        this.removeTimezone(parseInt(e.target.dataset.index));
+                    }
+                });
+            }
+
+            showSuggestions(value) {
+                if (value.length < 1) return this.elements.suggestions.style.display = 'none';
+
+                const matches = this.availableTimezones
+                    .filter(tz => tz.toLowerCase().includes(value))
+                    .slice(0, 10);
+
+                this.elements.suggestions.style.display = matches.length ? 'block' : 'none';
+                if (matches.length) {
+                    this.elements.suggestions.innerHTML = matches
+                        .map(tz => `<div class="suggestion-item">${tz}</div>`)
+                        .join('');
+                }
+            }
+
+            addTimezone(timezone) {
+                if (!timezone || this.timezones.includes(timezone)) return;
+
+                try {
+                    new Date().toLocaleString('en-US', { timeZone: timezone });
+                    this.timezones.push(timezone);
+                    localStorage.setItem('tools.timezones', JSON.stringify(this.timezones));
+                    this.renderTimezones();
+                    this.elements.timezoneSearch.value = '';
+                } catch (e) {
+                    alert('Invalid timezone. Please use valid IANA timezone names.');
+                }
+            }
+
+            removeTimezone(index) {
+                this.timezones.splice(index, 1);
+                localStorage.setItem('tools.timezones', JSON.stringify(this.timezones));
+                this.renderTimezones();
+            }
+
+            copyUrlToClipboard() {
+                const url = `${window.location.href.split('?')[0]}?timezones=${this.timezones.join(',')}`;
+                navigator.clipboard.writeText(url)
+                    .then(() => {
+                        const btn = document.getElementById('copy-url');
+                        btn.textContent = 'Copied!';
+                        setTimeout(() => btn.textContent = 'Copy URL', 2000);
+                    });
+            }
+        }
+
+        new WorldTime();
+    </script>
+</body>
+</html>
