@@ -5,66 +5,150 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CSV Merge</title>
     <style>
+        :root {
+            --color-primary: #3e56d4;
+            --color-primary-dark: #1431ca;
+            --color-text: #333;
+            --color-text-secondary: #666;
+            --color-accent: #ff6e6e;
+            --color-background: #f8f9fa;
+            --color-surface: #fafafa;
+            --color-border: #e5e7eb;
+            --color-border-light: #ddd;
+            --color-border-hover: #000;
+            --color-white: #fff;
+        }
+
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            max-width: 800px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            max-width: 700px;
             margin: 0 auto;
             padding: 20px;
+            background-color: var(--color-background);
+            line-height: 1.6;
+            font-size: 14px;
+            color: var(--color-text);
         }
+
+        h1 {
+            font-size: 1.8em;
+            margin-bottom: 1em;
+            color: var(--color-primary);
+        }
+
+        .hidden {
+            display: none;
+        }
+
         .drop-zone {
-            border: 2px dashed #ccc;
-            border-radius: 4px;
-            padding: 20px;
-            text-align: center;
-            margin: 20px 0;
-            min-height: 100px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background-color: var(--color-surface);
+            border: 1px solid var(--color-border);
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+            min-height: 80px;
+            position: relative;
+            cursor: pointer;
         }
+
         .drop-zone.dragover {
-            background-color: #e1f5fe;
-            border-color: #2196f3;
+            background-color: #f5f7ff;
+            border-color: var(--color-primary);
         }
-        #fileList {
-            margin: 20px 0;
+
+        .drop-zone input[type="file"] {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
         }
+
         .file-item {
             display: flex;
             justify-content: space-between;
             align-items: flex-start;
-            padding: 8px;
-            background: #f5f5f5;
-            margin: 4px 0;
+            padding: 6px 12px;
+            background: var(--color-white);
+            margin: 3px 0;
             border-radius: 4px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
         }
+
         .file-stats {
-            font-size: 0.9em;
-            color: #666;
-            padding: 4px 8px;
+            font-size: 0.85em;
+            color: var(--color-accent);
         }
-        .file-item .file-stats {
-            padding: 0;
-        }
-        .hidden {
-            display: none;
-        }
+
         .preview-container {
             max-height: 200px;
             overflow: auto;
-            background: #f5f5f5;
-            padding: 10px;
+            background: var(--color-white);
+            padding: 8px;
+            border: 1px solid var(--color-border-light);
+            border-radius: 4px;
+            margin: 10px 0;
         }
-        #downloadButton {
-            font-size: large;
+
+        .mt-10 {
+            margin-top: 10px;
+        }
+
+        /* Buttons */
+        button {
+            background-color: var(--color-primary);
+            color: var(--color-white);
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 500;
+        }
+
+        button:hover {
+            background-color: var(--color-primary-dark);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .file-item button {
+            background-color: transparent;
+            color: var(--color-text-secondary);
+            border: 1px solid var(--color-border-light);
+        }
+
+        .file-item button:hover {
+            background-color: #f9f9f9;
+            color: var(--color-border-hover);
+            border-color: var(--color-border-hover);
+        }
+
+        .upload-button {
+            background-color: var(--color-primary);
+            color: var(--color-white);
+            padding: 6px 12px;
+            border-radius: 4px;
+            margin-top: 8px;
+            pointer-events: none;
         }
     </style>
 </head>
 <body>
     <h1>CSV Merge</h1>
     <div class="drop-zone" id="dropZone">
-        <p>Drag and drop CSV files here or</p>
+        <p>Drag and drop CSV files here or click to browse</p>
+        <div class="upload-button">Select Files</div>
         <input type="file" id="fileInput" multiple accept=".csv">
     </div>
     <div id="fileList"></div>
-    <button id="mergeButton" disabled>Merge CSV Files</button>
+    <button id="mergeButton" disabled class="mt-10">Merge CSV Files</button>
     <div id="downloadSection" class="hidden">
         <p>Preview of merged data:</p>
         <pre id="preview" class="preview-container"></pre>
@@ -98,28 +182,23 @@
                     this.dropZone.classList.add('dragover');
                 });
 
-                this.dropZone.addEventListener('dragleave', () => 
-                    this.dropZone.classList.remove('dragover'));
-
+                this.dropZone.addEventListener('dragleave', () => this.dropZone.classList.remove('dragover'));
                 this.dropZone.addEventListener('drop', e => {
                     e.preventDefault();
                     this.dropZone.classList.remove('dragover');
                     this.handleFiles(e.dataTransfer.files);
                 });
-
-                this.fileInput.addEventListener('change', e => 
-                    this.handleFiles(e.target.files));
-
+                this.fileInput.addEventListener('change', e => this.handleFiles(e.target.files));
                 this.mergeButton.addEventListener('click', () => this.handleMerge());
             }
 
             async handleFiles(newFiles) {
                 const csvFiles = Array.from(newFiles).filter(file => file.type === 'text/csv');
-                for (const file of csvFiles) {
+                await Promise.all(csvFiles.map(async file => {
                     const content = await this.readFile(file);
                     file.stats = this.getFileStats(content);
-                }
-                this.files = [...this.files, ...csvFiles];
+                }));
+                this.files.push(...csvFiles);
                 this.updateFileList();
                 this.mergeButton.disabled = this.files.length < 2;
                 this.resetPreview();
@@ -226,10 +305,7 @@
             downloadCSV(content, filename) {
                 const blob = new Blob([content], { type: 'text/csv' });
                 const url = URL.createObjectURL(blob);
-                Object.assign(document.createElement('a'), {
-                    href: url,
-                    download: filename
-                }).click();
+                Object.assign(document.createElement('a'), { href: url, download: filename }).click();
                 URL.revokeObjectURL(url);
             }
         }
