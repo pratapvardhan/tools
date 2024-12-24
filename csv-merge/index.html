@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSV Merge</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .drop-zone {
+            border: 2px dashed #ccc;
+            border-radius: 4px;
+            padding: 20px;
+            text-align: center;
+            margin: 20px 0;
+            min-height: 100px;
+        }
+        .drop-zone.dragover {
+            background-color: #e1f5fe;
+            border-color: #2196f3;
+        }
+        #fileList {
+            margin: 20px 0;
+        }
+        .file-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding: 8px;
+            background: #f5f5f5;
+            margin: 4px 0;
+            border-radius: 4px;
+        }
+        .file-stats {
+            font-size: 0.9em;
+            color: #666;
+            padding: 4px 8px;
+        }
+        .file-item .file-stats {
+            padding: 0;
+        }
+        .hidden {
+            display: none;
+        }
+        .preview-container {
+            max-height: 200px;
+            overflow: auto;
+            background: #f5f5f5;
+            padding: 10px;
+        }
+        #downloadButton {
+            font-size: large;
+        }
+    </style>
+</head>
+<body>
+    <h1>CSV Merge</h1>
+    <div class="drop-zone" id="dropZone">
+        <p>Drag and drop CSV files here or</p>
+        <input type="file" id="fileInput" multiple accept=".csv">
+    </div>
+    <div id="fileList"></div>
+    <button id="mergeButton" disabled>Merge CSV Files</button>
+    <div id="downloadSection" class="hidden">
+        <p>Preview of merged data:</p>
+        <pre id="preview" class="preview-container"></pre>
+        <div class="file-stats">
+            <span id="mergedStats"></span>
+        </div>
+        <button id="downloadButton">Download merged.csv</button>
+    </div>
+
+    <script>
+        class CSVMerger {
+            constructor() {
+                this.files = [];
+                this.initElements();
+                this.initEventListeners();
+            }
+
+            initElements() {
+                this.dropZone = document.getElementById('dropZone');
+                this.fileInput = document.getElementById('fileInput');
+                this.fileList = document.getElementById('fileList');
+                this.mergeButton = document.getElementById('mergeButton');
+                this.downloadSection = document.getElementById('downloadSection');
+                this.preview = document.getElementById('preview');
+                this.mergedStats = document.getElementById('mergedStats');
+            }
+
+            initEventListeners() {
+                this.dropZone.addEventListener('dragover', e => {
+                    e.preventDefault();
+                    this.dropZone.classList.add('dragover');
+                });
+
+                this.dropZone.addEventListener('dragleave', () => 
+                    this.dropZone.classList.remove('dragover'));
+
+                this.dropZone.addEventListener('drop', e => {
+                    e.preventDefault();
+                    this.dropZone.classList.remove('dragover');
+                    this.handleFiles(e.dataTransfer.files);
+                });
+
+                this.fileInput.addEventListener('change', e => 
+                    this.handleFiles(e.target.files));
+
+                this.mergeButton.addEventListener('click', () => this.handleMerge());
+            }
+
+            async handleFiles(newFiles) {
+                const csvFiles = Array.from(newFiles).filter(file => file.type === 'text/csv');
+                for (const file of csvFiles) {
+                    const content = await this.readFile(file);
+                    file.stats = this.getFileStats(content);
+                }
+                this.files = [...this.files, ...csvFiles];
+                this.updateFileList();
+                this.mergeButton.disabled = this.files.length < 2;
+                this.resetPreview();
+            }
+
+            getFileStats(content) {
+                const lines = content.split('\n').filter(line => line.trim());
+                if (!lines.length) return { rows: 0, columns: 0 };
+                return {
+                    rows: lines.length - 1,
+                    columns: lines[0].split(',').length
+                };
+            }
+
+            updateFileList() {
+                this.fileList.innerHTML = this.files
+                    .map((file, index) => `
+                        <div class="file-item">
+                            <div>
+                                <span>${file.name}</span>
+                                <div class="file-stats">
+                                    ${file.stats.rows} rows × ${file.stats.columns} columns
+                                </div>
+                            </div>
+                            <button onclick="csvMerger.removeFile(${index})">Remove</button>
+                        </div>
+                    `).join('');
+            }
+
+            removeFile(index) {
+                this.files.splice(index, 1);
+                this.updateFileList();
+                this.mergeButton.disabled = this.files.length < 2;
+                this.resetPreview();
+            }
+
+            resetPreview() {
+                this.downloadSection.classList.add('hidden');
+                this.preview.textContent = '';
+                this.mergedStats.textContent = '';
+            }
+
+            async handleMerge() {
+                try {
+                    const mergedData = await this.mergeCSVFiles();
+                    this.downloadSection.classList.remove('hidden');
+                    
+                    const lines = mergedData.split('\n');
+                    this.preview.textContent = lines.slice(0, 5).join('\n') + 
+                        (lines.length > 5 ? '\n...' : '');
+                    
+                    this.mergedStats.textContent = `Merged file: ${lines.length - 1} rows × ${lines[0].split(',').length} columns`;
+        
+                    document.getElementById('downloadButton').onclick = () => 
+                        this.downloadCSV(mergedData, 'merged.csv');
+                } catch (error) {
+                    alert('Error merging CSV files: ' + error.message);
+                }
+            }
+
+            async mergeCSVFiles() {
+                // Check if all files have the same number of columns
+                const columnCounts = this.files.map(file => file.stats.columns);
+                const firstColumnCount = columnCounts[0];
+                if (!columnCounts.every(count => count === firstColumnCount)) {
+                    throw new Error('All CSV files must have the same number of columns to merge');
+                }
+
+                const headers = new Set();
+                const allData = [];
+
+                for (const file of this.files) {
+                    const content = await this.readFile(file);
+                    const lines = content.split('\n').filter(line => line.trim());
+                    if (!lines.length) continue;
+
+                    const fileHeaders = lines[0].split(',').map(h => h.trim());
+                    fileHeaders.forEach(h => headers.add(h));
+
+                    allData.push(...lines.slice(1).map(line => {
+                        const values = line.split(',');
+                        return Object.fromEntries(
+                            fileHeaders.map((header, index) => [header, values[index]?.trim() ?? ''])
+                        );
+                    }));
+                }
+
+                const headerArray = Array.from(headers);
+                return [
+                    headerArray.join(','),
+                    ...allData.map(row => headerArray.map(header => row[header] || '').join(','))
+                ].join('\n');
+            }
+
+            readFile(file) {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = e => resolve(e.target.result);
+                    reader.onerror = reject;
+                    reader.readAsText(file);
+                });
+            }
+
+            downloadCSV(content, filename) {
+                const blob = new Blob([content], { type: 'text/csv' });
+                const url = URL.createObjectURL(blob);
+                Object.assign(document.createElement('a'), {
+                    href: url,
+                    download: filename
+                }).click();
+                URL.revokeObjectURL(url);
+            }
+        }
+
+        const csvMerger = new CSVMerger();
+    </script>
+</body>
+</html>
