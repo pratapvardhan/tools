@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Splitter</title>
+    <meta name="description" content="Split PDF files into multiple parts. Files are processed locally in your browser - no data is uploaded.
+
+    .">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f4;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 30px;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+        }
+        .text-center {
+            text-align: center;
+        }
+        .text-secondary {
+            color: #666;
+        }
+        .mb-20 {
+            margin-bottom: 20px;
+        }
+        .mb-10 {
+            margin-bottom: 10px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        input[type="file"], input[type="text"], button {
+            width: 100%;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        
+        input[type="file"], input[type="text"] {
+            border: 1px solid #ccc;
+        }
+        
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        
+        button:hover {
+            background-color: #0056b3;
+        }
+        
+        #output a {
+            color: #007bff;
+            text-decoration: none;
+            padding: 10px;
+            margin: 5px 0;
+            border: 1px solid #007bff;
+            border-radius: 5px;
+        }
+        
+        #output a:hover {
+            background-color: #f8f9fa;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="text-center mb-10">PDF Splitter</h1>
+        <p class="text-center text-secondary mb-20">
+            Files are split locally in your browser - no data is uploaded.
+        </p>
+        <form id="pdfForm">
+            <div class="mb-10">
+                <label for="pdfFile">Select PDF File:</label>
+                <input type="file" id="pdfFile" class="mb-10" accept="application/pdf" required>
+                <div id="pageCount" class="mb-10 text-secondary"></div>
+                <label for="pageRanges">Enter Page Ranges (e.g., 1-3,5):</label>
+                <input type="text" id="pageRanges" class="mb-10" placeholder="1-3,5" required>
+            </div>
+            <button type="submit" class="mb-20">Split PDF</button>
+        </form>
+        <div id="output"></div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+    <script>
+        document.getElementById('pdfForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const fileInput = document.getElementById('pdfFile');
+            const pageRangesInput = document.getElementById('pageRanges');
+            const outputDiv = document.getElementById('output');
+
+            outputDiv.innerHTML = '';
+
+            if (!fileInput.files.length) {
+                alert('Please select a PDF file.');
+                return;
+            }
+
+            const file = fileInput.files[0];
+            const pageRanges = pageRangesInput.value;
+
+            try {
+                const fileBuffer = await file.arrayBuffer();
+                const pdfDoc = await PDFLib.PDFDocument.load(fileBuffer);
+
+                const ranges = pageRanges.split(',').map(range => {
+                    const [start, end] = range.split('-').map(Number);
+                    return end ? { start, end } : { start, end: start };
+                });
+
+                let fileIndex = 1;
+
+                for (const range of ranges) {
+                    const newPdfDoc = await PDFLib.PDFDocument.create();
+                    
+                    for (let i = range.start; i <= range.end; i++) {
+                        if (i < 1 || i > pdfDoc.getPageCount()) {
+                            throw new Error(`Page ${i} is out of bounds.`);
+                        }
+                        const [copiedPage] = await newPdfDoc.copyPages(pdfDoc, [i - 1]);
+                        newPdfDoc.addPage(copiedPage);
+                    }
+
+                    const pdfBytes = await newPdfDoc.save();
+                    const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(blob);
+                    link.download = `Extracted-Part-${fileIndex} ${range.start}-${range.end}.pdf`;
+                    link.textContent = `Download pages ${range.start}-${range.end}`;
+                    link.style.display = 'block';
+
+                    outputDiv.appendChild(link);
+                    fileIndex++;
+                }
+            } catch (error) {
+                alert(`Error: ${error.message}`);
+            }
+        });
+
+        document.getElementById('pdfFile').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                try {
+                    const fileBuffer = await file.arrayBuffer();
+                    const pdfDoc = await PDFLib.PDFDocument.load(fileBuffer);
+                    const pageCount = pdfDoc.getPageCount();
+                    document.getElementById('pageCount').textContent = `Total pages: ${pageCount}`;
+                } catch (error) {
+                    alert(`Error loading PDF: ${error.message}`);
+                }
+            }
+        });
+    </script>
+</body>
+</html>
