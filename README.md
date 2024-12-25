@@ -10,6 +10,7 @@ Some built with LLM assistance.
 - [Timezones](timezones/) - track time in multiple timezones.
 - [Notes in Browser tab](https://pratapvardhan.com/notes/browser/note-taking/) - write notes in your browser.
 - [CSV Merge](csv-merge/) - merge multiple CSV files.
+- [Location Mapper](location-mapper/) - geocode locations and plot on map
 
 Some helpful inspirations
 
