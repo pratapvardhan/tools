@@ -10,9 +10,10 @@ Some built with LLM assistance.
 - [PDF Splitter](pdf-splitter/) - split PDF files into multiple parts.
 - [Timezones](timezones/) - track time in multiple timezones.
 - [Location Mapper](location-mapper/) - geocode locations and plot on map
+- [Image Color Quantizer](image-color-quantizer/) - reduce number of colors in an image by combining them to nearest ones.
 - [Notepad](notepad/) - write notes in your browser.
 - [Notes in Browser tab](https://pratapvardhan.com/notes/browser/note-taking/) - write notes in your browser.
 
-Some helpful inspirations
+Helpful inspirations
 
 - [tools.simonwillison.net](https://tools.simonwillison.net) - Simon Willison's collection of tools.
