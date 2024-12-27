@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image to Base64 Converter</title>
+    <meta name="description" content="Convert an image to base64 string.">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            max-width: 800px;
+            margin: 20px auto;
+            padding: 0 20px;
+        }
+        .container {
+            width: 100%;
+            padding: 30px 0;
+        }
+        .drop-zone {
+            border: 2px dashed #ccc;
+            padding: 40px;
+            text-align: center;
+            border-radius: 8px;
+            background-color: #f8f9fa;
+            transition: all 0.3s ease;
+        }
+        .drop-zone:hover {
+            cursor: pointer;
+        }
+        .drop-zone.dragover {
+            background: #e1e1e1;
+            border-color: #999;
+        }
+        #urlInput {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-top: 8px;
+        }
+        #copyButton {
+            padding: 8px 16px;
+            border-radius: 4px;
+            background-color: #0d6efd;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        #copyButton:hover {
+            background-color: #0b5ed7;
+        }
+        #result {
+            word-break: break-all;
+            background: #dcdcdc;
+            padding: 12px;
+            height: 120px;
+            overflow-y: auto;
+            border-radius: 4px;
+        }
+        #preview {
+            max-width: 300px;
+        }
+        .flex {
+            display: flex;
+        }
+        .mt-20 {
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Image to Base64 Converter</h1>
+        
+        <div class="drop-zone mt-20" id="dropZone">
+            <p>Drop an image here, paste from clipboard, or click to upload</p>
+            <input type="file" id="fileInput" accept="image/*" style="display: none;">
+        </div>
+
+        <div class="mt-20">
+            <p>Or enter image URL:</p>
+            <input type="text" id="urlInput" placeholder="https://example.com/image.jpg">
+        </div>
+
+        <div id="result-container" class="mt-20" style="display: none;">
+            <div class="flex">
+                <button id="copyButton">Copy base64</button>
+                <span id="copyStatus" style="margin-left: 10px; color: #4CAF50;"></span>
+            </div>
+            <div id="result"></div>
+        </div>
+
+        <div id="preview-container" class="mt-20" style="display: none;">
+            <h4>Preview</h4>
+            <img id="preview">
+        </div>
+    </div>
+
+    <script>
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const urlInput = document.getElementById('urlInput');
+        const preview = document.getElementById('preview');
+        const previewContainer = document.getElementById('preview-container');
+        const result = document.getElementById('result');
+        const resultContainer = document.getElementById('result-container');
+        // Handle file upload via click
+        dropZone.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', handleFileSelect);
+
+        // Handle drag and drop
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('dragover');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            if (file && file.type.startsWith('image/')) {
+                processFile(file);
+            }
+        });
+
+        // Handle paste from clipboard
+        document.addEventListener('paste', (e) => {
+            const items = e.clipboardData.items;
+            for (let item of items) {
+                if (item.type.startsWith('image/')) {
+                    const file = item.getAsFile();
+                    processFile(file);
+                    break;
+                }
+            }
+        });
+
+        // Handle URL input
+        urlInput.addEventListener('input', debounce(handleUrlInput, 500));
+
+        function handleFileSelect(e) {
+            const file = e.target.files[0];
+            if (file) processFile(file);
+        }
+
+        function processFile(file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                preview.src = e.target.result;
+                previewContainer.style.display = 'block';
+                result.textContent = e.target.result;
+                resultContainer.style.display = 'block';
+                document.getElementById('copyButton').style.display = 'block';
+                document.getElementById('copyStatus').textContent = ''; // Reset status message
+            };
+            reader.readAsDataURL(file);
+        }
+
+        async function handleUrlInput() {
+            const url = urlInput.value.trim();
+            if (!url) return;
+
+            try {
+                const response = await fetch(url);
+                const blob = await response.blob();
+                processFile(blob);
+            } catch (error) {
+                result.textContent = 'Error loading image from URL';
+            }
+        }
+
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+
+        // Update copy button functionality
+        document.getElementById('copyButton').addEventListener('click', () => {
+            const copyStatus = document.getElementById('copyStatus');
+            navigator.clipboard.writeText(result.textContent)
+                .then(() => {
+                    copyStatus.textContent = 'Copied to clipboard!';
+                    setTimeout(() => {
+                        copyStatus.textContent = '';
+                    }, 2000); // Clear message after 2 seconds
+                })
+                .catch(err => {
+                    console.error('Failed to copy:', err);
+                    copyStatus.textContent = 'Failed to copy';
+                    copyStatus.style.color = '#f44336'; // Red color for error
+                });
+        });
+    </script>
+</body>
+</html>
