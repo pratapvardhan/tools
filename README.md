@@ -11,7 +11,7 @@ Some built with LLM assistance.
 - [Timezones](timezones/) - track time in multiple timezones.
 - [Code Editor](code-editor/) - write, run and share code (html/js) in your browser.
 - [Location Mapper](location-mapper/) - geocode locations and plot on map
-- [Image Color Quantizer](image-color-quantizer/) - reduce number of colors in an image by combining them to nearest ones.
+- [Image Color Quantizer](image-color-quantizer/) - reduce colors in an image by combining them to nearest ones.
 - [Image to Base64](image-to-base64/) - convert image to base64 string.
 - [Currency Converter](currency-converter/) - convert currencies.
 - [Notepad](notepad/) - write notes in your browser.
