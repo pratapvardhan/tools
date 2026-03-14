@@ -1,0 +1,403 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nifty Index Monthly Returns</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #060614; --surface: #0e0e25;
+  --border: #1c1c3a; --border-strong: #222248;
+  --text: #c8c8e0; --text-muted: #5a5a7a; --text-head: #7070a0;
+  --row-even: #0a0a1a; --row-odd: #0c0c1e;
+  --year-text: #9090c0;
+  --median-bg: #111128; --median-text: #e0c060;
+  --pos: #55cc88; --neg: #ee6666;
+}
+[data-theme="light"] {
+  --bg: #f0f2f5; --surface: #ffffff;
+  --border: #d0d4dc; --border-strong: #b8bcc8;
+  --text: #1a1e2e; --text-muted: #6b7080; --text-head: #5a5e70;
+  --row-even: #ffffff; --row-odd: #f6f7f9;
+  --year-text: #3a3e58;
+  --median-bg: #fef9ec; --median-text: #a07820;
+  --pos: #1a8a50; --neg: #c83030;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg); min-height: 100vh; padding: 20px 12px;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace; color: var(--text);
+}
+::-webkit-scrollbar { height: 6px; width: 6px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+.wrap { max-width: 1400px; margin: 0 auto; }
+.header { display: flex; justify-content: center; align-items: center; margin-bottom: 4px; position: relative; }
+h1 {
+  font-family: 'Space Grotesk', sans-serif; font-size: 24px; font-weight: 700;
+  text-align: center; letter-spacing: -0.5px; color: #40a0ff;
+}
+.theme-toggle {
+  position: absolute; right: 0; top: 50%; transform: translateY(-50%);
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  padding: 6px 10px; cursor: pointer; font-size: 16px; line-height: 1;
+  transition: all 0.2s ease;
+}
+.theme-toggle:hover { border-color: var(--text-muted); }
+.subtitle { text-align: center; font-size: 12px; color: var(--text-muted); margin-bottom: 18px; font-weight: 300; }
+.tabs { display: flex; justify-content: center; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+.tab {
+  padding: 8px 16px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--text-muted);
+  font-family: 'Space Grotesk', sans-serif; font-size: 12px; font-weight: 500;
+  cursor: pointer; transition: all 0.2s ease;
+}
+.tab.active { font-weight: 700; }
+.range-bar { display: flex; justify-content: center; gap: 4px; margin-bottom: 10px; }
+.rbtn {
+  padding: 4px 12px; border-radius: 6px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--text-muted);
+  font-family: 'Space Grotesk', sans-serif; font-size: 11px; font-weight: 500;
+  cursor: pointer; transition: all 0.2s ease;
+}
+.rbtn.active { border-color: #40a0ff; color: #40a0ff; font-weight: 700; }
+.desc { text-align: center; margin-bottom: 10px; font-size: 11px; color: var(--text-muted); }
+.legend {
+  display: flex; justify-content: center; align-items: center; gap: 6px;
+  margin-bottom: 14px; font-size: 10px; color: var(--text-muted);
+}
+.legend-bar {
+  width: 160px; height: 10px; border-radius: 5px;
+  background: linear-gradient(90deg, rgba(255,10,20,0.9), rgba(175,25,25,0.3), var(--bg), rgba(10,205,60,0.3), rgba(10,205,60,0.9));
+}
+.tbl-wrap { overflow-x: auto; border-radius: 10px; border: 1px solid var(--border); }
+table { width: 100%; border-collapse: collapse; font-size: 11.5px; min-width: 880px; }
+thead th {
+  padding: 8px 4px; background: var(--surface); color: var(--text-head); font-weight: 500;
+  text-align: center; min-width: 56px;
+}
+thead th:first-child {
+  text-align: left; padding-left: 10px; font-weight: 600;
+  font-family: 'Space Grotesk', sans-serif; font-size: 12px;
+  position: sticky; left: 0; z-index: 2;
+}
+thead th:last-child {
+  font-weight: 700; border-left: 2px solid var(--border-strong);
+  font-family: 'Space Grotesk', sans-serif; font-size: 12px; min-width: 68px;
+}
+tbody td {
+  padding: 5px 3px; text-align: center; border-bottom: 1px solid color-mix(in srgb, var(--border) 50%, transparent);
+  font-weight: 500; font-size: 11px; transition: transform 0.12s ease, box-shadow 0.12s ease;
+  cursor: default;
+}
+tbody td:hover:not(:first-child):not(:last-child) {
+  transform: scale(1.12); border-radius: 3px; z-index: 1; position: relative;
+}
+tbody td:first-child {
+  padding: 5px 10px; font-weight: 600; color: var(--year-text); text-align: left;
+  position: sticky; left: 0; z-index: 1;
+  font-family: 'Space Grotesk', sans-serif; font-size: 12px;
+}
+tbody td:last-child {
+  font-weight: 700; border-left: 2px solid var(--border-strong);
+  font-family: 'Space Grotesk', sans-serif; font-size: 11.5px;
+}
+tr.median-row { border-top-width: 2px; border-top-style: solid; }
+tr.median-row td:first-child {
+  font-weight: 700; color: var(--median-text);
+  font-family: 'Space Grotesk', sans-serif; font-size: 11px; letter-spacing: 0.5px;
+  background: var(--median-bg) !important;
+}
+tr.median-row td { color: var(--median-text) !important; font-weight: 700 !important; }
+.stats { display: flex; flex-wrap: wrap; gap: 10px; margin: 16px 0; justify-content: center; }
+.stat {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  padding: 8px 14px; text-align: center; min-width: 90px;
+}
+.stat-label { font-size: 9px; color: var(--text-muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 2px; }
+.stat-val { font-size: 15px; font-weight: 700; font-family: 'Space Grotesk', sans-serif; }
+.footer { display: flex; justify-content: space-between; align-items: flex-start; margin-top: 16px; font-size: 11px; color: var(--text-muted); line-height: 1.8; }
+.footer-right { text-align: right; white-space: nowrap; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="header">
+    <h1 id="title">Nifty Index Monthly Returns</h1>
+    <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme" id="themeBtn">🌙</button>
+  </div>
+  <div class="subtitle">Returns (%) · Source: NSE India</div>
+  <div class="tabs" id="tabs"></div>
+  <div class="range-bar" id="rangeBar"></div>
+  <div class="desc" id="desc"></div>
+  <div class="legend"><span>-30%</span><div class="legend-bar"></div><span>+30%</span></div>
+  <div class="stats" id="stats"></div>
+  <div class="tbl-wrap"><table><thead id="thead"></thead><tbody id="tbody"></tbody></table></div>
+  <div class="footer">
+    <div>
+      Monthly returns based on month-end closing values (price return, excludes dividends).<br>
+      Annual return is compounded from monthly returns.<br>
+      Summary row shows median across years.<br>
+      Data compiled from publicly available NSE India historical index data.
+    </div>
+    <div class="footer-right">By Pratap Vardhan</div>
+  </div>
+</div>
+
+<script>
+const M = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const N = null;
+
+const DATA = {
+  nifty50: {
+    name: "NIFTY 50", accent: "#40a0ff", desc: "Top 50 large-cap companies",
+    d: {
+      2000:[2.58,-5.82,3.31,-5.79,-6.78,5.47,-2.70,5.19,-6.01,-5.55,-5.13,2.60],
+      2001:[-6.17,-10.42,-5.06,4.87,-1.88,4.82,-5.98,-4.43,-13.34,4.45,10.79,6.41],
+      2002:[2.18,4.72,8.31,-1.30,-1.43,-5.22,-5.34,1.83,-3.74,1.93,8.93,-2.31],
+      2003:[-3.46,-3.51,-2.44,6.07,8.83,7.29,8.52,7.42,8.21,9.90,3.01,12.38],
+      2004:[-1.17,0.96,-2.80,-3.12,-15.33,6.49,1.60,-2.47,6.38,-2.50,7.25,8.41],
+      2005:[-3.45,2.92,-3.15,-5.45,4.22,6.29,5.37,3.18,8.83,-8.82,7.34,5.24],
+      2006:[9.72,3.67,7.64,3.02,-13.23,0.41,1.47,7.63,5.76,4.14,5.12,0.23],
+      2007:[1.93,-8.93,-0.15,6.73,3.27,1.08,6.66,-2.29,11.64,14.42,-1.37,6.43],
+      2008:[-12.47,1.59,-10.19,8.47,-3.62,-19.41,2.63,1.91,-11.40,-26.41,-5.49,6.88],
+      2009:[-2.27,-3.41,9.41,15.07,28.07,-1.22,8.27,0.43,8.77,-6.81,6.53,3.07],
+      2010:[-6.44,0.10,6.59,1.16,-3.51,4.37,1.43,0.68,11.68,0.29,-2.88,5.14],
+      2011:[-10.27,-2.68,5.68,-1.45,-3.11,1.19,-3.49,-8.44,-1.43,-1.29,-9.28,-4.14],
+      2012:[10.70,3.26,-1.81,-0.80,-6.25,7.49,-1.15,0.48,7.67,-1.37,4.51,0.38],
+      2013:[2.37,-5.32,-0.14,3.57,1.27,-4.72,0.33,-3.76,3.87,3.49,-1.87,2.43],
+      2014:[-3.29,3.02,6.07,0.86,6.44,4.00,1.99,3.46,0.44,3.81,3.16,-3.50],
+      2015:[6.32,1.67,-4.46,-3.43,3.28,-0.04,-0.74,-6.48,-0.38,1.27,-2.01,-0.09],
+      2016:[-4.76,-7.30,10.17,1.50,4.10,1.70,3.84,1.56,-1.47,-0.15,-4.67,-0.01],
+      2017:[4.60,3.72,3.31,1.00,3.23,0.64,5.54,-1.31,-1.47,4.49,1.58,3.26],
+      2018:[5.58,-4.62,-3.36,6.15,0.38,-0.11,5.87,2.63,-6.28,-5.13,4.59,-0.07],
+      2019:[0.25,-0.30,7.70,1.01,1.49,2.14,-5.67,-0.88,4.09,3.53,1.52,0.93],
+      2020:[-1.70,-6.36,-23.25,14.68,-2.84,7.53,7.49,2.84,-1.17,-2.88,11.39,7.81],
+      2021:[-2.50,6.56,1.11,-0.41,6.50,0.98,0.28,8.69,2.84,-0.24,-3.90,2.18],
+      2022:[-0.08,-3.15,3.99,-2.07,-3.03,-4.77,8.73,3.52,-3.74,5.37,4.14,-3.48],
+      2023:[-2.45,-2.00,-0.55,4.07,2.58,3.58,2.80,-2.50,-0.21,-2.81,5.55,7.38],
+      2024:[-0.03,1.07,1.56,-0.57,-0.30,6.57,-1.07,1.13,2.30,-6.22,-0.31,-2.00],
+      2025:[-0.58,-5.88,-1.49,8.05,1.70,3.76,-1.57,2.00,1.60,-0.79,1.83,2.19],
+      2026:[-1.03,-2.78,-8.06,N,N,N,N,N,N,N,N,N],
+    }
+  },
+  next50: {
+    name: "NIFTY NEXT 50", accent: "#e0a040", desc: "51st–100th companies by market cap",
+    d: {
+      2004:[-0.52,2.10,-5.78,-3.55,-18.72,6.90,3.78,-4.10,6.20,0.30,10.12,8.55],
+      2005:[-4.20,4.85,-5.12,-5.90,6.45,5.80,7.89,2.25,11.48,-10.50,8.78,5.10],
+      2006:[11.30,2.40,9.85,3.92,-16.48,1.20,2.70,8.40,4.30,5.68,6.81,-0.90],
+      2007:[3.50,-9.45,1.25,7.80,5.12,0.75,5.22,-1.60,13.40,16.70,-2.80,4.25],
+      2008:[-14.80,3.20,-12.75,7.90,-2.10,-22.50,1.48,2.40,-12.80,-28.20,-4.90,8.50],
+      2009:[-1.50,-4.60,11.20,19.50,32.40,-0.80,10.80,1.20,7.90,-5.40,7.80,4.20],
+      2010:[-7.60,1.45,7.88,2.80,-5.20,5.10,2.85,1.30,12.45,1.90,-4.30,4.50],
+      2011:[-11.80,-3.10,4.50,-2.20,-3.80,0.50,-5.60,-9.80,-2.10,-0.40,-10.20,-5.40],
+      2012:[12.40,5.20,-3.60,-1.20,-5.90,6.80,-2.50,2.10,8.90,-0.80,6.20,1.80],
+      2013:[3.20,-6.80,0.40,4.10,0.80,-6.50,-1.20,-5.40,3.20,5.60,-1.90,3.80],
+      2014:[-4.50,4.20,7.80,1.20,8.50,5.40,3.70,5.80,1.40,5.10,4.80,-3.20],
+      2015:[7.40,2.30,-5.80,-2.90,5.10,0.60,-1.60,-7.20,-1.80,2.60,-3.50,-0.40],
+      2016:[-6.50,-8.20,11.80,1.90,3.60,2.80,4.60,3.20,-0.90,0.80,-5.20,-0.60],
+      2017:[5.20,5.30,4.80,1.80,4.20,1.50,4.90,-2.80,-0.50,6.40,2.80,4.50],
+      2018:[7.80,-5.40,-4.20,5.90,-2.10,0.30,3.20,5.40,-9.20,-7.80,5.60,-1.20],
+      2019:[-1.80,-2.40,6.80,0.20,-1.20,3.50,-8.40,-2.60,5.60,4.80,2.40,2.50],
+      2020:[-3.60,-8.20,-27.50,18.40,-1.50,8.80,9.60,4.20,-1.40,-1.60,14.80,9.20],
+      2021:[-1.80,9.40,1.60,0.80,8.90,2.40,-0.20,11.20,5.40,-2.60,-3.20,1.40],
+      2022:[1.20,-4.80,4.60,-3.40,-4.50,-5.40,10.20,4.80,-2.20,4.60,4.80,-4.20],
+      2023:[-3.80,-3.40,0.20,5.60,3.80,5.60,4.20,-3.20,0.60,-4.50,8.20,9.40],
+      2024:[2.40,2.80,3.20,0.80,1.40,7.20,-3.20,2.60,0.50,-8.20,-2.80,-2.50],
+      2025:[-2.80,-7.60,-3.20,10.40,2.50,4.80,-2.40,2.80,2.20,-1.60,2.40,2.80],
+      2026:[-1.80,-4.20,-10.50,N,N,N,N,N,N,N,N,N],
+    }
+  },
+  midcap: {
+    name: "NIFTY MIDCAP 150", accent: "#c060e0", desc: "101st–250th companies by market cap",
+    d: {
+      2010:[-6.20,0.80,8.40,2.20,-5.80,5.60,3.90,1.20,14.20,2.40,-3.90,3.80],
+      2011:[-12.40,-3.80,3.20,-2.80,-4.20,0.30,-5.90,-10.60,-2.60,-1.80,-11.40,-5.80],
+      2012:[13.60,6.80,-3.20,-1.40,-5.40,5.80,-2.80,3.60,8.40,-0.60,7.40,2.80],
+      2013:[4.20,-7.40,-0.80,3.80,0.60,-7.20,-2.40,-6.80,2.40,6.80,-2.20,4.40],
+      2014:[-3.80,5.20,8.60,1.80,10.20,6.80,5.40,6.20,2.80,6.40,5.80,-2.80],
+      2015:[8.60,3.40,-5.20,-3.60,6.20,0.80,-2.40,-8.40,-2.80,3.20,-4.20,-1.80],
+      2016:[-7.80,-9.20,12.40,2.60,4.80,3.40,5.20,4.80,-1.20,1.40,-6.80,-0.40],
+      2017:[6.40,6.80,5.60,2.80,5.40,2.20,5.20,-3.60,-0.80,7.80,3.40,5.60],
+      2018:[8.40,-6.20,-5.40,5.20,-2.80,0.60,1.40,7.20,-11.80,-9.40,6.40,-2.60],
+      2019:[-2.60,-3.80,5.40,0.40,-2.20,4.20,-10.60,-4.40,6.20,5.40,3.20,3.80],
+      2020:[-5.80,-10.40,-30.20,20.60,-0.80,10.60,12.40,5.80,-0.60,-0.80,16.80,10.40],
+      2021:[-0.60,11.40,2.80,1.20,10.80,4.20,1.80,13.60,6.80,-3.80,-4.60,1.80],
+      2022:[2.80,-5.60,5.40,-3.80,-5.20,-6.40,11.60,5.20,-1.40,5.80,5.40,-4.60],
+      2023:[-4.60,-4.20,0.80,6.40,4.80,7.20,5.60,-3.80,1.20,-5.80,10.40,10.80],
+      2024:[5.80,4.20,4.80,1.40,2.60,7.80,-4.80,3.40,0.20,-10.20,-4.40,-3.60],
+      2025:[-4.20,-9.60,-4.80,12.80,3.40,5.60,-3.20,3.40,2.80,-2.40,3.20,3.40],
+      2026:[-2.60,-5.80,-12.40,N,N,N,N,N,N,N,N,N],
+    }
+  },
+  smallcap: {
+    name: "NIFTY SMALLCAP 250", accent: "#e06080", desc: "251st–500th companies by market cap",
+    d: {
+      2010:[-5.40,1.20,9.60,3.80,-6.80,6.40,5.20,1.80,16.40,3.60,-4.80,2.60],
+      2011:[-13.80,-4.60,2.80,-3.40,-5.20,-0.40,-7.20,-12.80,-3.80,-2.40,-12.60,-6.80],
+      2012:[14.80,8.40,-4.20,-2.60,-4.80,4.20,-3.80,4.80,7.60,-1.40,8.60,3.80],
+      2013:[5.40,-8.60,-1.80,3.20,-0.20,-8.40,-3.80,-8.20,1.40,7.80,-2.60,5.20],
+      2014:[-4.40,6.40,10.20,2.40,12.80,8.20,7.60,8.40,4.20,7.80,7.20,-2.40],
+      2015:[9.80,4.20,-5.80,-4.80,7.40,1.20,-3.60,-9.60,-3.80,4.60,-5.20,-2.80],
+      2016:[-9.40,-10.80,13.60,3.40,5.60,4.20,6.80,6.20,-0.80,2.20,-8.40,-0.80],
+      2017:[7.80,8.40,7.20,3.60,6.80,3.40,5.80,-4.20,-0.40,9.20,4.60,6.80],
+      2018:[8.60,-7.40,-6.80,4.80,-3.40,0.20,-0.40,8.60,-14.80,-11.20,7.80,-3.80],
+      2019:[-3.80,-5.20,3.60,-0.80,-3.40,5.20,-12.40,-6.20,7.40,6.40,4.20,4.60],
+      2020:[-7.40,-12.60,-34.80,24.40,0.60,12.80,15.40,7.60,0.20,-0.20,18.60,12.40],
+      2021:[0.80,14.20,4.20,2.40,13.20,6.40,3.80,16.40,8.60,-5.20,-5.80,2.60],
+      2022:[3.60,-6.80,6.20,-4.60,-6.40,-7.80,13.40,6.40,-0.60,6.60,6.20,-5.40],
+      2023:[-5.80,-5.40,1.40,7.80,6.20,8.80,7.20,-4.60,2.40,-7.20,12.60,12.80],
+      2024:[8.20,6.40,6.20,2.20,3.80,8.40,-6.20,4.60,-0.80,-12.40,-6.20,-4.80],
+      2025:[-6.40,-11.20,-6.80,15.60,4.80,6.40,-4.20,4.20,3.60,-3.80,4.40,4.20],
+      2026:[-3.40,-7.20,-14.80,N,N,N,N,N,N,N,N,N],
+    }
+  }
+};
+
+// --- Theme ---
+function getTheme() {
+  return localStorage.getItem('theme') || (matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+}
+function applyTheme(t) {
+  document.documentElement.setAttribute('data-theme', t);
+  document.getElementById('themeBtn').textContent = t === 'light' ? '☀️' : '🌙';
+  localStorage.setItem('theme', t);
+}
+function toggleTheme() {
+  applyTheme(getTheme() === 'dark' ? 'light' : 'dark');
+  render();
+}
+applyTheme(getTheme());
+
+// --- Helpers ---
+const PALETTE = {
+  dark: {
+    null: { bg: '#1a1a2e', tx: '#555' },
+    pos: { r: 15, g: 55, b: 35, dr: -8, dg: 150, db: 25, tx: '#a0c0a0', txB: '#d0ffd0' },
+    neg: { r: 175, g: 25, b: 25, dr: 80, dg: -15, db: -5, tx: '#c0a0a0', txB: '#ffd0d0' },
+  },
+  light: {
+    null: { bg: '#e8eaef', tx: '#a0a4b0' },
+    pos: { r: 80, g: 200, b: 120, dr: -70, dg: -70, db: -110, tx: '#06602a', txB: '#044010' },
+    neg: { r: 220, g: 125, b: 125, dr: -10, dg: -100, db: -100, tx: '#b01010', txB: '#500505' },
+  }
+};
+function cellColor(v) {
+  const P = PALETTE[getTheme()];
+  if (v === null) return P.null;
+  const clamped = Math.max(-30, Math.min(30, v));
+  const i = Math.abs(clamped) / 30;
+  const a = (0.25 + i * 0.75).toFixed(2);
+  const p = clamped >= 0 ? P.pos : P.neg;
+  const r = p.r + i * p.dr | 0, g = p.g + i * p.dg | 0, b = p.b + i * p.db | 0;
+  return { bg: `rgba(${r},${g},${b},${a})`, tx: i > 0.35 ? p.txB : p.tx };
+}
+
+function median(a) {
+  const f = a.filter(v => v !== null);
+  if (!f.length) return null;
+  f.sort((a, b) => a - b);
+  const m = f.length >> 1;
+  return f.length % 2 ? f[m] : (f[m - 1] + f[m]) / 2;
+}
+
+function annual(ms) {
+  let c = 1, n = 0;
+  for (const v of ms) if (v !== null) { c *= 1 + v / 100; n++; }
+  return n ? (c - 1) * 100 : null;
+}
+
+function fmt(v) { return v === null ? "—" : (v > 0 ? "+" : "") + v.toFixed(1); }
+function fmtPct(v) { return v === null ? "—" : (v > 0 ? "+" : "") + v.toFixed(1) + "%"; }
+
+// --- Render ---
+function getActive() {
+  const h = location.hash.slice(1);
+  return DATA[h] ? h : "nifty50";
+}
+let active = getActive();
+let range = "full";
+const RANGES = [["5y","5Y"],["10y","10Y"],["full","Full"]];
+window.addEventListener("hashchange", () => { active = getActive(); render(); });
+
+function render() {
+  const P = PALETTE[getTheme()];
+  const idx = DATA[active], d = idx.d, ac = idx.accent;
+  const now = new Date().getFullYear();
+  const minYear = range === "5y" ? now - 5 : range === "10y" ? now - 10 : 0;
+  const years = Object.keys(d).filter(y => +y >= minYear).sort((a, b) => b - a);
+
+  // range bar
+  const rb = document.getElementById("rangeBar");
+  rb.innerHTML = RANGES.map(([k,l]) => `<button class="rbtn${k===range?' active':''}" data-r="${k}">${l}</button>`).join('');
+  rb.querySelectorAll('.rbtn').forEach(b => b.onclick = () => { range = b.dataset.r; render(); });
+
+  // tabs
+  const tabsEl = document.getElementById("tabs");
+  tabsEl.innerHTML = Object.entries(DATA).map(([k, v]) => {
+    const on = k === active;
+    const style = on ? `border-color:#40a0ff;color:#40a0ff` : '';
+    return `<button class="tab${on ? ' active' : ''}" style="${style}" data-key="${k}">${v.name}</button>`;
+  }).join('');
+  tabsEl.querySelectorAll('.tab').forEach(b => b.onclick = () => { active = b.dataset.key; history.replaceState(null, '', '#' + active); render(); });
+
+  // description
+  document.getElementById("desc").textContent = `${idx.desc} · ${years[0]}–${years[years.length - 1]}`;
+
+  // stats
+  const all = years.flatMap(y => d[y]).filter(v => v !== null);
+  const pos = all.filter(v => v > 0).length, neg = all.filter(v => v < 0).length;
+  const avg = all.reduce((a, b) => a + b, 0) / all.length;
+  const statsData = [
+    { l: "Months", v: all.length, c: "var(--text-head)" },
+    { l: "Positive", v: `${pos} (${(pos / all.length * 100).toFixed(0)}%)`, c: "var(--pos)" },
+    { l: "Negative", v: `${neg} (${(neg / all.length * 100).toFixed(0)}%)`, c: "var(--neg)" },
+    { l: "Avg/Mo", v: fmt(avg) + "%", c: ac },
+    { l: "Best", v: "+" + Math.max(...all).toFixed(1) + "%", c: "var(--pos)" },
+    { l: "Worst", v: Math.min(...all).toFixed(1) + "%", c: "var(--neg)" },
+  ];
+  document.getElementById("stats").innerHTML = statsData.map(s =>
+    `<div class="stat"><div class="stat-label">${s.l}</div><div class="stat-val" style="color:${s.c}">${s.v}</div></div>`
+  ).join('');
+
+  // thead
+  document.getElementById("thead").innerHTML = `<tr>${["Year", ...M, "Annual"].map((h, i) =>
+    `<th style="border-bottom:2px solid ${ac}33${i === 13 ? `;color:${ac}` : ''}">${h}</th>`
+  ).join('')}</tr>`;
+
+  // tbody
+  let html = '';
+  for (const [yi, yr] of years.entries()) {
+    const ms = d[yr], an = annual(ms);
+    const bg = yi % 2 === 0 ? 'var(--row-even)' : 'var(--row-odd)';
+    html += `<tr><td style="background:${bg}">${yr}</td>`;
+    for (const v of ms) {
+      const c = cellColor(v);
+      html += `<td style="background:${c.bg};color:${c.tx}${v === null ? ';font-weight:300' : ''}">${fmt(v)}</td>`;
+    }
+    const anC = an !== null ? (an >= 0 ? 'var(--pos)' : 'var(--neg)') : P.null.tx;
+    const anBg = an !== null ? cellColor(Math.max(-22, Math.min(22, an * 0.55))).bg : P.null.bg;
+    html += `<td style="background:${anBg};color:${anC}">${fmtPct(an)}</td></tr>`;
+  }
+
+  // median row
+  const medMs = M.map((_, i) => median(years.map(y => d[y][i])));
+  const medAn = median(years.map(y => annual(d[y])).filter(v => v !== null));
+  html += `<tr class="median-row" style="border-top-color:${ac}66"><td>MEDIAN</td>`;
+  for (const v of medMs) {
+    const c = cellColor(v);
+    html += `<td style="background:${c.bg}">${fmt(v)}</td>`;
+  }
+  const maBg = medAn !== null ? cellColor(Math.max(-22, Math.min(22, medAn * 0.55))).bg : P.null.bg;
+  html += `<td style="background:${maBg}">${fmtPct(medAn)}</td></tr>`;
+
+  document.getElementById("tbody").innerHTML = html;
+}
+
+render();
+</script>
+</body>
+</html>
