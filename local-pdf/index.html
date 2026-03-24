@@ -213,7 +213,19 @@ a { color: var(--accent); text-decoration: none; }
   <p>Free browser-only PDF toolkit. Files never leave your device.</p>
 </div>
 
-<div id="tool-grid"></div>
+<div id="tool-grid">
+  <div class="tool-card" data-tool="merge" role="button" tabindex="0"><div class="icon">📎</div><div class="name">Merge PDF</div><div class="desc">Combine multiple PDFs into one</div></div>
+  <div class="tool-card" data-tool="split" role="button" tabindex="0"><div class="icon">✂️</div><div class="name">Split PDF</div><div class="desc">Extract or separate pages</div></div>
+  <div class="tool-card" data-tool="edit" role="button" tabindex="0"><div class="icon">✏️</div><div class="name">Edit PDF</div><div class="desc">Add text, images, shapes</div></div>
+  <div class="tool-card" data-tool="sign" role="button" tabindex="0"><div class="icon">🖊️</div><div class="name">Sign PDF</div><div class="desc">Draw or upload a signature</div></div>
+  <div class="tool-card" data-tool="jpg2pdf" role="button" tabindex="0"><div class="icon">📄</div><div class="name">JPG to PDF</div><div class="desc">Convert images to PDF</div></div>
+  <div class="tool-card" data-tool="pdf2jpg" role="button" tabindex="0"><div class="icon">🖼️</div><div class="name">PDF to JPG</div><div class="desc">Convert pages to images</div></div>
+  <div class="tool-card" data-tool="organize" role="button" tabindex="0"><div class="icon">📋</div><div class="name">Organize PDF</div><div class="desc">Reorder, delete, duplicate pages</div></div>
+  <div class="tool-card" data-tool="rotate" role="button" tabindex="0"><div class="icon">🔄</div><div class="name">Rotate PDF</div><div class="desc">Rotate pages 90°, 180°, 270°</div></div>
+  <div class="tool-card" data-tool="crop" role="button" tabindex="0"><div class="icon">✂️</div><div class="name">Crop PDF</div><div class="desc">Crop page margins</div></div>
+  <div class="tool-card" data-tool="pagenums" role="button" tabindex="0"><div class="icon">#️⃣</div><div class="name">Page Numbers</div><div class="desc">Add page numbers</div></div>
+  <div class="tool-card" data-tool="watermark" role="button" tabindex="0"><div class="icon">💧</div><div class="name">Watermark</div><div class="desc">Stamp text or image on pages</div></div>
+</div>
 
 <div id="tool-workspace">
   <div id="workspace-header">
@@ -241,36 +253,19 @@ const state = {
   settings: {}
 };
 
-const TOOLS = [
-  { id: 'merge', name: 'Merge PDF', icon: '📎', desc: 'Combine multiple PDFs into one' },
-  { id: 'split', name: 'Split PDF', icon: '✂️', desc: 'Extract or separate pages' },
-  { id: 'rotate', name: 'Rotate PDF', icon: '🔄', desc: 'Rotate pages 90°, 180°, 270°' },
-  { id: 'organize', name: 'Organize PDF', icon: '📋', desc: 'Reorder, delete, duplicate pages' },
-  { id: 'pdf2jpg', name: 'PDF to JPG', icon: '🖼️', desc: 'Convert pages to images' },
-  { id: 'jpg2pdf', name: 'JPG to PDF', icon: '📄', desc: 'Convert images to PDF' },
-  { id: 'edit', name: 'Edit PDF', icon: '✏️', desc: 'Add text, images, shapes' },
-  { id: 'watermark', name: 'Watermark', icon: '💧', desc: 'Stamp text or image on pages' },
-  { id: 'pagenums', name: 'Page Numbers', icon: '#️⃣', desc: 'Add page numbers' },
-  { id: 'sign', name: 'Sign PDF', icon: '🖊️', desc: 'Draw or upload a signature' },
-  { id: 'crop', name: 'Crop PDF', icon: '✂️', desc: 'Crop page margins' },
-];
-
 /* ===== RENDER TOOL GRID ===== */
 function renderToolGrid() {
-  const grid = document.getElementById('tool-grid');
-  grid.innerHTML = TOOLS.map(t => `
-    <div class="tool-card" role="button" tabindex="0" onclick="openTool('${t.id}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openTool('${t.id}')}">
-      <div class="icon">${t.icon}</div>
-      <div class="name">${t.name}</div>
-      <div class="desc">${t.desc}</div>
-    </div>
-  `).join('');
+  document.querySelectorAll('#tool-grid .tool-card[data-tool]').forEach(card => {
+    const id = card.dataset.tool;
+    card.onclick = () => openTool(id);
+    card.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openTool(id); } };
+  });
 }
 
 /* ===== NAVIGATION ===== */
 function openTool(id) {
-  const tool = TOOLS.find(t => t.id === id);
-  if (!tool) return;
+  const card = document.querySelector(`#tool-grid .tool-card[data-tool="${id}"]`);
+  if (!card || !TOOL_BUILDERS[id]) return;
   state.currentTool = id;
   state.files = [];
   state.pdfDoc = null;
@@ -280,7 +275,7 @@ function openTool(id) {
   document.getElementById('app-header').style.display = 'none';
   const ws = document.getElementById('tool-workspace');
   ws.classList.add('active');
-  document.getElementById('workspace-title').textContent = tool.name;
+  document.getElementById('workspace-title').textContent = card.querySelector('.name').textContent;
   const body = document.getElementById('workspace-body');
   body.innerHTML = '';
   TOOL_BUILDERS[id](body);
