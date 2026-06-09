@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="shortcut icon" href="https://pratapvardhan.com/assets/favicon.ico">
+    <title>Markdown Preview</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/markdown-it@14.1.0/dist/markdown-it.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+    <style>
+        :root {
+            color-scheme: light;
+            --bg: #f7f7f4;
+            --surface: #ffffff;
+            --surface-muted: #f1f4f2;
+            --border: #d8ddd7;
+            --border-strong: #b8c1ba;
+            --text: #202522;
+            --muted: #65706a;
+            --accent: #146c5f;
+            --accent-hover: #0f584d;
+            --danger: #a33c32;
+            --shadow: 0 1px 2px rgba(21, 27, 24, 0.08);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            height: 100%;
+        }
+
+        body {
+            margin: 0;
+            min-width: 320px;
+            background: var(--bg);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            line-height: 1.5;
+        }
+
+        button,
+        input,
+        textarea {
+            font: inherit;
+        }
+
+        .app {
+            min-height: 100%;
+            display: grid;
+            grid-template-rows: auto minmax(0, 1fr);
+        }
+
+        .topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            padding: 0.75rem 1rem;
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            box-shadow: var(--shadow);
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1rem;
+            font-weight: 650;
+            letter-spacing: 0;
+        }
+
+        .actions {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 0.35rem;
+            flex-wrap: wrap;
+        }
+
+        .mobile-tabs {
+            display: none;
+        }
+
+        .mobile-tab {
+            min-height: 2.25rem;
+            border: 1px solid var(--border-strong);
+            background: var(--surface);
+            color: var(--muted);
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 650;
+        }
+
+        .mobile-tab:first-child {
+            border-radius: 6px 0 0 6px;
+        }
+
+        .mobile-tab:last-child {
+            border-radius: 0 6px 6px 0;
+        }
+
+        .mobile-tab + .mobile-tab {
+            margin-left: -1px;
+        }
+
+        .mobile-tab.is-active {
+            position: relative;
+            z-index: 1;
+            border-color: var(--accent);
+            background: var(--accent);
+            color: #ffffff;
+        }
+
+        .mobile-tab:focus-visible {
+            position: relative;
+            z-index: 2;
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+
+        .button {
+            min-height: 2rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.3rem;
+            padding: 0.32rem 0.55rem;
+            border: 1px solid var(--border-strong);
+            border-radius: 6px;
+            background: var(--surface);
+            color: var(--text);
+            cursor: pointer;
+            font-size: 0.9rem;
+            white-space: nowrap;
+        }
+
+        .button:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .button:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+
+        .button.primary {
+            border-color: var(--accent);
+            background: var(--accent);
+            color: #ffffff;
+        }
+
+        .button.primary:hover {
+            background: var(--accent-hover);
+            color: #ffffff;
+        }
+
+        .button.danger:hover {
+            border-color: var(--danger);
+            color: var(--danger);
+        }
+
+        .button svg {
+            width: 0.9rem;
+            height: 0.9rem;
+            flex: 0 0 auto;
+        }
+
+        .workspace {
+            min-height: 0;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            gap: 1rem;
+            padding: 1rem;
+        }
+
+        .pane {
+            min-width: 0;
+            min-height: 0;
+            display: grid;
+            grid-template-rows: auto minmax(0, 1fr);
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: var(--shadow);
+        }
+
+        .pane-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            min-height: 2.65rem;
+            padding: 0.55rem 0.75rem;
+            background: var(--surface-muted);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .pane-title {
+            margin: 0;
+            font-size: 0.88rem;
+            font-weight: 650;
+        }
+
+        .status {
+            min-width: 8rem;
+            color: var(--muted);
+            font-size: 0.78rem;
+            text-align: right;
+            white-space: nowrap;
+        }
+
+        textarea {
+            width: 100%;
+            height: 100%;
+            min-height: 28rem;
+            resize: none;
+            border: 0;
+            outline: 0;
+            padding: 1rem;
+            color: var(--text);
+            background: #fbfcfa;
+            font: 0.95rem/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            tab-size: 2;
+        }
+
+        .preview {
+            min-height: 28rem;
+            overflow: auto;
+            padding: 1rem 1.25rem 4rem;
+            background: var(--surface);
+        }
+
+        .preview :first-child {
+            margin-top: 0;
+        }
+
+        .preview :last-child {
+            margin-bottom: 0;
+        }
+
+        .preview h1,
+        .preview h2,
+        .preview h3,
+        .preview h4,
+        .preview h5,
+        .preview h6 {
+            line-height: 1.25;
+            margin: 1.45em 0 0.55em;
+            letter-spacing: 0;
+        }
+
+        .preview h1 {
+            padding-bottom: 0.35rem;
+            border-bottom: 1px solid var(--border);
+            font-size: 1.85rem;
+        }
+
+        .preview h2 {
+            padding-bottom: 0.25rem;
+            border-bottom: 1px solid var(--border);
+            font-size: 1.45rem;
+        }
+
+        .preview h3 {
+            font-size: 1.2rem;
+        }
+
+        .preview p,
+        .preview ul,
+        .preview ol,
+        .preview blockquote,
+        .preview pre,
+        .preview table {
+            margin: 0 0 1rem;
+        }
+
+        .preview a {
+            color: var(--accent);
+        }
+
+        .preview blockquote {
+            padding: 0.1rem 0 0.1rem 1rem;
+            color: #4f5f56;
+            border-left: 4px solid #9fc4bc;
+        }
+
+        .preview code {
+            padding: 0.1rem 0.25rem;
+            border-radius: 4px;
+            background: #eef2ef;
+            font: 0.9em/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        }
+
+        .preview pre {
+            overflow: auto;
+            padding: 0.9rem 1rem;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: #f5f7f5;
+        }
+
+        .preview pre code {
+            padding: 0;
+            background: transparent;
+            font-size: 0.88rem;
+        }
+
+        .preview table {
+            width: 100%;
+            border-collapse: collapse;
+            display: block;
+            overflow-x: auto;
+        }
+
+        .preview th,
+        .preview td {
+            padding: 0.45rem 0.6rem;
+            border: 1px solid var(--border);
+        }
+
+        .preview th {
+            background: var(--surface-muted);
+            text-align: left;
+        }
+
+        .preview img {
+            max-width: 100%;
+            height: auto;
+        }
+
+        .preview hr {
+            height: 1px;
+            margin: 1.5rem 0;
+            border: 0;
+            background: var(--border);
+        }
+
+        .empty-preview {
+            color: var(--muted);
+        }
+
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+
+        @media (max-width: 840px) {
+            .app {
+                min-height: 100vh;
+            }
+
+            .topbar {
+                align-items: stretch;
+                flex-direction: column;
+            }
+
+            .actions {
+                justify-content: flex-start;
+            }
+
+            .mobile-tabs {
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                width: 100%;
+            }
+
+            .workspace {
+                grid-template-columns: 1fr;
+                grid-auto-rows: minmax(0, 1fr);
+            }
+
+            .pane[data-view] {
+                display: none;
+            }
+
+            .pane[data-view].is-active {
+                display: grid;
+            }
+
+            textarea,
+            .preview {
+                min-height: 24rem;
+            }
+        }
+
+        @media (max-width: 520px) {
+            .topbar,
+            .workspace {
+                padding: 0.75rem;
+            }
+
+            .actions {
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                width: 100%;
+            }
+
+            .button {
+                width: 100%;
+                padding-inline: 0.45rem;
+            }
+
+            .status {
+                min-width: 0;
+                white-space: normal;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main class="app">
+        <header class="topbar">
+            <h1>Markdown Preview</h1>
+            <div class="actions" aria-label="Markdown actions">
+                <button class="button" type="button" id="openFileButton" title="Open Markdown file">
+                    <i data-lucide="folder-open" aria-hidden="true"></i>
+                    <span>Open</span>
+                </button>
+                <button class="button" type="button" id="printPdfButton" title="Export PDF">
+                    <i data-lucide="printer" aria-hidden="true"></i>
+                    <span>PDF</span>
+                </button>
+                <button class="button" type="button" id="downloadButton" title="Download Markdown">
+                    <i data-lucide="download" aria-hidden="true"></i>
+                    <span>Download</span>
+                </button>
+                <button class="button" type="button" id="copyMarkdownButton" title="Copy Markdown">
+                    <i data-lucide="copy" aria-hidden="true"></i>
+                    <span>MD</span>
+                </button>
+                <button class="button" type="button" id="copyHtmlButton" title="Copy HTML">
+                    <i data-lucide="copy" aria-hidden="true"></i>
+                    <span>HTML</span>
+                </button>
+                <button class="button" type="button" id="sampleButton" title="Load sample">
+                    <i data-lucide="file-text" aria-hidden="true"></i>
+                    <span>Sample</span>
+                </button>
+                <button class="button danger" type="button" id="clearButton" title="Clear editor">
+                    <i data-lucide="trash-2" aria-hidden="true"></i>
+                    <span>Clear</span>
+                </button>
+            </div>
+            <div class="mobile-tabs" role="tablist" aria-label="Markdown views">
+                <button class="mobile-tab is-active" type="button" id="editorTab" role="tab" aria-selected="true" aria-controls="editorPane" data-view="editor">
+                    Editor
+                </button>
+                <button class="mobile-tab" type="button" id="previewTab" role="tab" aria-selected="false" aria-controls="previewPane" tabindex="-1" data-view="preview">
+                    Preview
+                </button>
+            </div>
+            <input class="sr-only" type="file" id="fileInput" accept=".md,.markdown,.txt,text/markdown,text/plain">
+        </header>
+
+        <section class="workspace" aria-label="Markdown editor and preview">
+            <div class="pane is-active" id="editorPane" role="tabpanel" aria-labelledby="editorTab" data-view="editor">
+                <div class="pane-header">
+                    <h2 class="pane-title">Markdown</h2>
+                    <div class="status" id="editorStatus" aria-live="polite"></div>
+                </div>
+                <textarea id="editor" spellcheck="false" aria-label="Markdown editor"></textarea>
+            </div>
+
+            <div class="pane" id="previewPane" role="tabpanel" aria-labelledby="previewTab" data-view="preview">
+                <div class="pane-header">
+                    <h2 class="pane-title">Preview</h2>
+                    <div class="status" id="renderStatus" aria-live="polite"></div>
+                </div>
+                <article class="preview" id="preview" aria-label="Rendered Markdown preview"></article>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        const storageKey = "markdown-preview-content";
+        const defaultMarkdown = `# Markdown Preview
+
+Write Markdown on the left and see the rendered output here.
+
+## Examples
+
+- **Bold text**, _italic text_, and [links](https://commonmark.org)
+- Ordered and unordered lists
+- Tables, blockquotes, images, and code blocks
+
+| Feature | Status |
+| --- | --- |
+| Live preview | Ready |
+| Local autosave | Ready |
+| Sanitized HTML | Ready |
+
+> Pasted HTML is sanitized before it is shown.
+
+\`\`\`js
+function greet(name) {
+  return \`Hello, \${name}!\`;
+}
+\`\`\``;
+
+        const editor = document.getElementById("editor");
+        const preview = document.getElementById("preview");
+        const editorStatus = document.getElementById("editorStatus");
+        const renderStatus = document.getElementById("renderStatus");
+        const fileInput = document.getElementById("fileInput");
+        const openFileButton = document.getElementById("openFileButton");
+        const printPdfButton = document.getElementById("printPdfButton");
+        const downloadButton = document.getElementById("downloadButton");
+        const copyMarkdownButton = document.getElementById("copyMarkdownButton");
+        const copyHtmlButton = document.getElementById("copyHtmlButton");
+        const sampleButton = document.getElementById("sampleButton");
+        const clearButton = document.getElementById("clearButton");
+        const viewTabs = Array.from(document.querySelectorAll(".mobile-tab"));
+        const viewPanes = Array.from(document.querySelectorAll(".pane[data-view]"));
+
+        const md = window.markdownit({
+            html: true,
+            linkify: true,
+            typographer: true,
+            highlight(code, language) {
+                const canHighlight = language && window.hljs && hljs.getLanguage(language);
+                if (canHighlight) {
+                    try {
+                        return hljs.highlight(code, { language }).value;
+                    } catch (error) {
+                        console.warn("Highlighting failed:", error);
+                    }
+                }
+
+                return md.utils.escapeHtml(code);
+            },
+        });
+
+        function render() {
+            const markdown = editor.value;
+            const rendered = md.render(markdown);
+            const clean = DOMPurify.sanitize(rendered, {
+                USE_PROFILES: { html: true },
+                ADD_ATTR: ["target"],
+            });
+
+            preview.innerHTML = clean || '<p class="empty-preview">Nothing to preview.</p>';
+            preview.querySelectorAll("a[href]").forEach((link) => {
+                link.target = "_blank";
+                link.rel = "noopener noreferrer";
+            });
+
+            const words = markdown.trim() ? markdown.trim().split(/\s+/).length : 0;
+            editorStatus.textContent = `${words} words · ${markdown.length} chars`;
+            renderStatus.textContent = markdown ? "Saved locally" : "Empty";
+            localStorage.setItem(storageKey, markdown);
+        }
+
+        async function copyText(text, statusNode, successText) {
+            try {
+                await navigator.clipboard.writeText(text);
+                statusNode.textContent = successText;
+            } catch (error) {
+                const scratch = document.createElement("textarea");
+                scratch.value = text;
+                scratch.setAttribute("readonly", "");
+                scratch.style.position = "fixed";
+                scratch.style.opacity = "0";
+                document.body.appendChild(scratch);
+                scratch.select();
+                document.execCommand("copy");
+                scratch.remove();
+                statusNode.textContent = successText;
+            }
+
+            window.setTimeout(render, 1200);
+        }
+
+        function escapeHtml(value) {
+            return value
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        function exportPdf() {
+            const printFrame = document.createElement("iframe");
+            const title = escapeHtml(document.title || "Markdown Preview");
+            const content = preview.innerHTML || '<p class="empty-preview">Nothing to preview.</p>';
+
+            printFrame.title = "Markdown PDF export";
+            printFrame.style.position = "fixed";
+            printFrame.style.right = "0";
+            printFrame.style.bottom = "0";
+            printFrame.style.width = "0";
+            printFrame.style.height = "0";
+            printFrame.style.border = "0";
+
+            printFrame.srcdoc = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>${title}</title>
+    <style>
+        @page {
+            margin: 0.75in;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            color: #202522;
+            background: #ffffff;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-size: 11pt;
+            line-height: 1.55;
+        }
+
+        h1,
+        h2,
+        h3,
+        h4,
+        h5,
+        h6 {
+            line-height: 1.25;
+            margin: 1.3em 0 0.5em;
+            break-after: avoid;
+            page-break-after: avoid;
+        }
+
+        h1 {
+            padding-bottom: 0.3rem;
+            border-bottom: 1px solid #d8ddd7;
+            font-size: 22pt;
+        }
+
+        h2 {
+            padding-bottom: 0.22rem;
+            border-bottom: 1px solid #d8ddd7;
+            font-size: 17pt;
+        }
+
+        h3 {
+            font-size: 13.5pt;
+        }
+
+        p,
+        ul,
+        ol,
+        blockquote,
+        pre,
+        table {
+            margin: 0 0 0.9rem;
+        }
+
+        a {
+            color: #146c5f;
+            text-decoration: underline;
+        }
+
+        blockquote {
+            padding: 0.1rem 0 0.1rem 0.8rem;
+            color: #4f5f56;
+            border-left: 4px solid #9fc4bc;
+        }
+
+        code {
+            padding: 0.08rem 0.22rem;
+            border-radius: 4px;
+            background: #eef2ef;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            font-size: 0.9em;
+        }
+
+        pre {
+            overflow: visible;
+            padding: 0.75rem 0.85rem;
+            border: 1px solid #d8ddd7;
+            border-radius: 6px;
+            background: #f5f7f5;
+            white-space: pre-wrap;
+            break-inside: avoid;
+            page-break-inside: avoid;
+        }
+
+        pre code {
+            padding: 0;
+            background: transparent;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            break-inside: auto;
+            page-break-inside: auto;
+        }
+
+        tr {
+            break-inside: avoid;
+            page-break-inside: avoid;
+        }
+
+        th,
+        td {
+            padding: 0.4rem 0.5rem;
+            border: 1px solid #d8ddd7;
+            vertical-align: top;
+        }
+
+        th {
+            background: #f1f4f2;
+            text-align: left;
+        }
+
+        img {
+            max-width: 100%;
+            height: auto;
+            break-inside: avoid;
+            page-break-inside: avoid;
+        }
+
+        hr {
+            height: 1px;
+            margin: 1.3rem 0;
+            border: 0;
+            background: #d8ddd7;
+        }
+
+        .empty-preview {
+            color: #65706a;
+        }
+    </style>
+</head>
+<body>
+    ${content}
+</body>
+</html>`;
+
+            document.body.appendChild(printFrame);
+
+            printFrame.addEventListener("load", () => {
+                const printWindow = printFrame.contentWindow;
+                if (!printWindow) {
+                    printFrame.remove();
+                    return;
+                }
+
+                const removeFrame = () => {
+                    window.setTimeout(() => printFrame.remove(), 250);
+                };
+
+                printWindow.addEventListener("afterprint", removeFrame, { once: true });
+                window.setTimeout(removeFrame, 30000);
+                printWindow.focus();
+                printWindow.print();
+            }, { once: true });
+        }
+
+        function downloadMarkdown() {
+            const blob = new Blob([editor.value], { type: "text/markdown;charset=utf-8" });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = "markdown-preview.md";
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(url);
+        }
+
+        function loadFile(file) {
+            const reader = new FileReader();
+            reader.onload = () => {
+                editor.value = String(reader.result || "");
+                render();
+            };
+            reader.readAsText(file);
+        }
+
+        function setActiveView(view, shouldFocusTab = false) {
+            viewTabs.forEach((tab) => {
+                const isActive = tab.dataset.view === view;
+                tab.classList.toggle("is-active", isActive);
+                tab.setAttribute("aria-selected", String(isActive));
+                tab.setAttribute("tabindex", isActive ? "0" : "-1");
+
+                if (isActive && shouldFocusTab) {
+                    tab.focus();
+                }
+            });
+
+            viewPanes.forEach((pane) => {
+                pane.classList.toggle("is-active", pane.dataset.view === view);
+            });
+        }
+
+        editor.addEventListener("input", render);
+
+        editor.addEventListener("keydown", (event) => {
+            if (event.key === "Tab") {
+                event.preventDefault();
+                const start = editor.selectionStart;
+                const end = editor.selectionEnd;
+                editor.setRangeText("  ", start, end, "end");
+                render();
+            }
+        });
+
+        viewTabs.forEach((tab) => {
+            tab.addEventListener("click", () => setActiveView(tab.dataset.view));
+            tab.addEventListener("keydown", (event) => {
+                if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") {
+                    return;
+                }
+
+                event.preventDefault();
+                const currentIndex = viewTabs.indexOf(tab);
+                const nextIndex = event.key === "ArrowRight"
+                    ? (currentIndex + 1) % viewTabs.length
+                    : (currentIndex - 1 + viewTabs.length) % viewTabs.length;
+
+                setActiveView(viewTabs[nextIndex].dataset.view, true);
+            });
+        });
+
+        openFileButton.addEventListener("click", () => fileInput.click());
+        printPdfButton.addEventListener("click", exportPdf);
+        fileInput.addEventListener("change", () => {
+            const [file] = fileInput.files;
+            if (file) {
+                loadFile(file);
+            }
+            fileInput.value = "";
+        });
+
+        downloadButton.addEventListener("click", downloadMarkdown);
+        copyMarkdownButton.addEventListener("click", () => copyText(editor.value, editorStatus, "Markdown copied"));
+        copyHtmlButton.addEventListener("click", () => copyText(preview.innerHTML, renderStatus, "HTML copied"));
+
+        sampleButton.addEventListener("click", () => {
+            editor.value = defaultMarkdown;
+            render();
+            setActiveView("editor");
+            editor.focus();
+        });
+
+        clearButton.addEventListener("click", () => {
+            editor.value = "";
+            render();
+            setActiveView("editor");
+            editor.focus();
+        });
+
+        editor.value = localStorage.getItem(storageKey) || defaultMarkdown;
+        render();
+
+        if (window.lucide) {
+            lucide.createIcons();
+        }
+    </script>
+</body>
+</html>
