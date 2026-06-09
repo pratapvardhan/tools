@@ -1,0 +1,1173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="shortcut icon" href="https://pratapvardhan.com/assets/favicon.ico">
+    <title>Table Format Converter</title>
+    <script>
+        (() => {
+            const storageKey = "table-format-converter-theme";
+            let theme = "light";
+
+            try {
+                const savedTheme = localStorage.getItem(storageKey);
+                const prefersDark = window.matchMedia?.("(prefers-color-scheme: dark)").matches;
+                theme = savedTheme === "dark" || savedTheme === "light"
+                    ? savedTheme
+                    : prefersDark ? "dark" : "light";
+            } catch (error) {
+                theme = window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+            }
+
+            document.documentElement.dataset.theme = theme;
+            window.tableFormatConverterInitialTheme = theme;
+        })();
+    </script>
+    <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+    <style>
+        :root {
+            color-scheme: light;
+            --bg: #f5f6f3;
+            --surface: #ffffff;
+            --surface-muted: #f3f6fb;
+            --editor-bg: #fbfcfa;
+            --border: #d9dfd6;
+            --border-strong: #aeb9ad;
+            --text: #202420;
+            --muted: #626d64;
+            --accent: #2563eb;
+            --accent-hover: #1d4ed8;
+            --accent-soft: #eaf1ff;
+            --warn: #985c12;
+            --danger: #a83f35;
+            --on-accent: #ffffff;
+            --shadow: 0 1px 2px rgba(20, 28, 22, 0.08);
+        }
+
+        :root[data-theme="dark"] {
+            color-scheme: dark;
+            --bg: #151816;
+            --surface: #1f2421;
+            --surface-muted: #232a35;
+            --editor-bg: #171b19;
+            --border: #3d4740;
+            --border-strong: #526159;
+            --text: #eef1ee;
+            --muted: #a8b3aa;
+            --accent: #60a5fa;
+            --accent-hover: #93c5fd;
+            --accent-soft: #17243f;
+            --warn: #f2b56b;
+            --danger: #f08b80;
+            --on-accent: #0d1715;
+            --shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            min-height: 100%;
+        }
+
+        body {
+            margin: 0;
+            min-width: 320px;
+            background: var(--bg);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            line-height: 1.5;
+        }
+
+        button,
+        textarea,
+        input {
+            font: inherit;
+        }
+
+        button {
+            border: 0;
+        }
+
+        .app {
+            min-height: 100vh;
+            display: grid;
+            grid-template-rows: auto auto minmax(0, 1fr) auto;
+        }
+
+        .topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            padding: 0.85rem 1rem;
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            box-shadow: var(--shadow);
+        }
+
+        .title-block {
+            min-width: 0;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.05rem;
+            font-weight: 700;
+            letter-spacing: 0;
+        }
+
+        .subtitle {
+            margin: 0.15rem 0 0;
+            color: var(--muted);
+            font-size: 0.88rem;
+        }
+
+        .actions,
+        .panel-actions,
+        .format-row {
+            display: flex;
+            align-items: center;
+            gap: 0.45rem;
+            flex-wrap: wrap;
+        }
+
+        .button,
+        .segment {
+            min-height: 2.1rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.35rem;
+            padding: 0.35rem 0.65rem;
+            border: 1px solid var(--border-strong);
+            border-radius: 6px;
+            background: var(--surface);
+            color: var(--text);
+            cursor: pointer;
+            font-size: 0.9rem;
+            white-space: nowrap;
+        }
+
+        .button:hover,
+        .segment:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .button:focus-visible,
+        .segment:focus-visible,
+        input:focus-visible,
+        textarea:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+
+        .button.primary {
+            border-color: var(--accent);
+            background: var(--accent);
+            color: var(--on-accent);
+        }
+
+        .button.primary:hover {
+            background: var(--accent-hover);
+            color: var(--on-accent);
+        }
+
+        .button.danger:hover {
+            border-color: var(--danger);
+            color: var(--danger);
+        }
+
+        .button svg,
+        .segment svg {
+            width: 0.95rem;
+            height: 0.95rem;
+            flex: 0 0 auto;
+        }
+
+        .button.icon-button {
+            width: 2.1rem;
+            padding-inline: 0;
+        }
+
+        .controls {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border);
+            background: var(--surface-muted);
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            min-width: 0;
+        }
+
+        .control-label {
+            color: var(--muted);
+            font-size: 0.8rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            white-space: nowrap;
+        }
+
+        .segmented {
+            display: inline-flex;
+            align-items: stretch;
+            flex-wrap: nowrap;
+        }
+
+        .segment {
+            border-radius: 0;
+            font-weight: 650;
+        }
+
+        .segment:first-child {
+            border-radius: 6px 0 0 6px;
+        }
+
+        .segment:last-child {
+            border-radius: 0 6px 6px 0;
+        }
+
+        .segment + .segment {
+            margin-left: -1px;
+        }
+
+        .segment[aria-pressed="true"] {
+            position: relative;
+            z-index: 1;
+            border-color: var(--accent);
+            background: var(--accent);
+            color: var(--on-accent);
+        }
+
+        .options {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 0.9rem;
+            flex-wrap: wrap;
+        }
+
+        .check {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            color: var(--text);
+            font-size: 0.9rem;
+            white-space: nowrap;
+        }
+
+        .check input {
+            width: 1rem;
+            height: 1rem;
+            accent-color: var(--accent);
+        }
+
+        .workspace {
+            min-height: 0;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+            gap: 1rem;
+            padding: 1rem;
+        }
+
+        .panel {
+            min-width: 0;
+            min-height: 0;
+            display: grid;
+            grid-template-rows: auto minmax(0, 1fr);
+            overflow: hidden;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--surface);
+            box-shadow: var(--shadow);
+        }
+
+        .panel-header {
+            min-height: 2.8rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            padding: 0.55rem 0.75rem;
+            border-bottom: 1px solid var(--border);
+            background: var(--surface-muted);
+        }
+
+        .panel-title {
+            margin: 0;
+            font-size: 0.9rem;
+            font-weight: 700;
+            letter-spacing: 0;
+            white-space: nowrap;
+        }
+
+        .status {
+            min-height: 1.2rem;
+            color: var(--muted);
+            font-size: 0.8rem;
+            text-align: right;
+        }
+
+        textarea {
+            width: 100%;
+            height: 100%;
+            min-height: 24rem;
+            resize: none;
+            border: 0;
+            outline: 0;
+            padding: 1rem;
+            color: var(--text);
+            background: var(--editor-bg);
+            font: 0.92rem/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            tab-size: 4;
+        }
+
+        textarea[readonly] {
+            background: var(--surface);
+        }
+
+        .preview-panel {
+            margin: 0 1rem 1rem;
+            min-height: 14rem;
+        }
+
+        .preview-wrap {
+            min-height: 0;
+            overflow: auto;
+            background: var(--surface);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+
+        th,
+        td {
+            min-width: 7rem;
+            max-width: 24rem;
+            padding: 0.45rem 0.6rem;
+            border: 1px solid var(--border);
+            text-align: left;
+            vertical-align: top;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+        }
+
+        th {
+            position: sticky;
+            top: 0;
+            z-index: 1;
+            background: var(--accent-soft);
+            font-weight: 700;
+        }
+
+        .row-number {
+            min-width: 3rem;
+            width: 3rem;
+            color: var(--muted);
+            background: var(--surface-muted);
+            text-align: right;
+            white-space: nowrap;
+        }
+
+        .empty {
+            min-height: 12rem;
+            display: grid;
+            place-items: center;
+            color: var(--muted);
+            padding: 1rem;
+            text-align: center;
+        }
+
+        .toast {
+            min-height: 1.25rem;
+            padding: 0 1rem 0.75rem;
+            color: var(--warn);
+            font-size: 0.86rem;
+        }
+
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+
+        @media (max-width: 980px) {
+            .topbar,
+            .controls {
+                align-items: stretch;
+                flex-direction: column;
+            }
+
+            .actions,
+            .options {
+                justify-content: flex-start;
+            }
+
+            .workspace {
+                grid-template-columns: 1fr;
+            }
+
+            textarea {
+                min-height: 18rem;
+            }
+        }
+
+        @media (max-width: 620px) {
+            .topbar,
+            .controls,
+            .workspace {
+                padding: 0.75rem;
+            }
+
+            .preview-panel {
+                margin: 0 0.75rem 0.75rem;
+            }
+
+            .actions,
+            .panel-actions,
+            .format-row,
+            .control-group {
+                width: 100%;
+            }
+
+            .button {
+                flex: 1 1 auto;
+            }
+
+            .segmented {
+                width: 100%;
+            }
+
+            .segment {
+                flex: 1 1 0;
+                min-width: 0;
+                padding-inline: 0.35rem;
+            }
+
+            .options {
+                width: 100%;
+                align-items: flex-start;
+                flex-direction: column;
+                gap: 0.45rem;
+            }
+
+            .panel-header {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+
+            .status {
+                text-align: left;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main class="app">
+        <header class="topbar">
+            <div class="title-block">
+                <h1>Table Format Converter</h1>
+                <p class="subtitle">Convert Markdown tables, CSV, and TSV for clipboard, Sheets, and docs.</p>
+            </div>
+            <div class="actions" aria-label="Table actions">
+                <button class="button icon-button" type="button" id="themeButton" title="Switch to dark mode" aria-label="Switch to dark mode" aria-pressed="false">
+                    <i data-lucide="moon" aria-hidden="true"></i>
+                </button>
+                <button class="button" type="button" id="sampleButton" title="Load sample table">
+                    <i data-lucide="file-text" aria-hidden="true"></i>
+                    <span>Sample</span>
+                </button>
+                <button class="button danger" type="button" id="clearButton" title="Clear input">
+                    <i data-lucide="trash-2" aria-hidden="true"></i>
+                    <span>Clear</span>
+                </button>
+            </div>
+        </header>
+
+        <section class="controls" aria-label="Conversion settings">
+            <div class="format-row">
+                <div class="control-group">
+                    <span class="control-label">Input</span>
+                    <div class="segmented" role="group" aria-label="Input format">
+                        <button class="segment" type="button" data-input-format="auto" aria-pressed="true">Auto</button>
+                        <button class="segment" type="button" data-input-format="markdown" aria-pressed="false">Markdown</button>
+                        <button class="segment" type="button" data-input-format="csv" aria-pressed="false">CSV</button>
+                        <button class="segment" type="button" data-input-format="tsv" aria-pressed="false">TSV</button>
+                    </div>
+                </div>
+                <div class="control-group">
+                    <span class="control-label">Output</span>
+                    <div class="segmented" role="group" aria-label="Output format">
+                        <button class="segment" type="button" data-output-format="markdown" aria-pressed="true">Markdown</button>
+                        <button class="segment" type="button" data-output-format="csv" aria-pressed="false">CSV</button>
+                        <button class="segment" type="button" data-output-format="tsv" aria-pressed="false">TSV</button>
+                    </div>
+                </div>
+            </div>
+            <div class="options" aria-label="Formatting options">
+                <label class="check">
+                    <input type="checkbox" id="trimCells" checked>
+                    <span>Trim cells</span>
+                </label>
+                <label class="check">
+                    <input type="checkbox" id="firstRowHeader" checked>
+                    <span>First row is header</span>
+                </label>
+                <label class="check">
+                    <input type="checkbox" id="padMarkdown" checked>
+                    <span>Align Markdown</span>
+                </label>
+            </div>
+        </section>
+
+        <section class="workspace" aria-label="Input and output">
+            <section class="panel">
+                <div class="panel-header">
+                    <h2 class="panel-title">Input</h2>
+                    <div class="status" id="inputStatus" aria-live="polite"></div>
+                </div>
+                <textarea id="inputText" spellcheck="false" aria-label="Input table text" placeholder="Paste a Markdown table, CSV, or TSV here"></textarea>
+            </section>
+
+            <section class="panel">
+                <div class="panel-header">
+                    <h2 class="panel-title">Output</h2>
+                    <div class="panel-actions">
+                        <button class="button primary" type="button" id="copyButton" title="Copy output">
+                            <i data-lucide="copy" aria-hidden="true"></i>
+                            <span>Copy</span>
+                        </button>
+                        <button class="button" type="button" id="copyTsvButton" title="Copy TSV for spreadsheets">
+                            <i data-lucide="clipboard" aria-hidden="true"></i>
+                            <span>Copy TSV</span>
+                        </button>
+                        <button class="button icon-button" type="button" id="downloadButton" title="Download output" aria-label="Download output">
+                            <i data-lucide="download" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                </div>
+                <textarea id="outputText" spellcheck="false" aria-label="Converted table text" readonly></textarea>
+            </section>
+        </section>
+
+        <section class="panel preview-panel" aria-label="Parsed table preview">
+            <div class="panel-header">
+                <h2 class="panel-title">Preview</h2>
+                <div class="status" id="previewStatus" aria-live="polite"></div>
+            </div>
+            <div class="preview-wrap" id="preview"></div>
+        </section>
+        <div class="toast" id="message" aria-live="polite"></div>
+    </main>
+
+    <script>
+        const sampleMarkdown = `| Tool | Input | Output |
+| --- | --- | --- |
+| Markdown table | GitHub issue table | CSV or TSV |
+| Spreadsheet rows | Sheets clipboard | Markdown table |
+| CSV export | Comma-separated values | Markdown or TSV |`;
+
+        const state = {
+            inputFormat: "auto",
+            outputFormat: "markdown",
+            trimCells: true,
+            firstRowHeader: true,
+            padMarkdown: true,
+            grid: [],
+            detectedFormat: "auto"
+        };
+
+        const inputText = document.getElementById("inputText");
+        const outputText = document.getElementById("outputText");
+        const inputStatus = document.getElementById("inputStatus");
+        const previewStatus = document.getElementById("previewStatus");
+        const preview = document.getElementById("preview");
+        const message = document.getElementById("message");
+        const trimCells = document.getElementById("trimCells");
+        const firstRowHeader = document.getElementById("firstRowHeader");
+        const padMarkdown = document.getElementById("padMarkdown");
+        const themeButton = document.getElementById("themeButton");
+        const sampleButton = document.getElementById("sampleButton");
+        const clearButton = document.getElementById("clearButton");
+        const copyButton = document.getElementById("copyButton");
+        const copyTsvButton = document.getElementById("copyTsvButton");
+        const downloadButton = document.getElementById("downloadButton");
+        const inputFormatButtons = Array.from(document.querySelectorAll("[data-input-format]"));
+        const outputFormatButtons = Array.from(document.querySelectorAll("[data-output-format]"));
+        const themeStorageKey = "table-format-converter-theme";
+        const systemThemeQuery = window.matchMedia?.("(prefers-color-scheme: dark)") || null;
+
+        function getStoredTheme() {
+            try {
+                const storedTheme = localStorage.getItem(themeStorageKey);
+                return storedTheme === "dark" || storedTheme === "light" ? storedTheme : null;
+            } catch (error) {
+                return null;
+            }
+        }
+
+        function setStoredTheme(theme) {
+            try {
+                localStorage.setItem(themeStorageKey, theme);
+            } catch (error) {
+                return;
+            }
+        }
+
+        function getPreferredTheme() {
+            const storedTheme = getStoredTheme();
+
+            if (storedTheme) {
+                return storedTheme;
+            }
+
+            if (systemThemeQuery) {
+                return systemThemeQuery.matches ? "dark" : "light";
+            }
+
+            return window.tableFormatConverterInitialTheme || "light";
+        }
+
+        function updateThemeButton(theme) {
+            const nextTheme = theme === "dark" ? "light" : "dark";
+            const icon = theme === "dark" ? "sun" : "moon";
+            const label = `Switch to ${nextTheme} mode`;
+
+            themeButton.title = label;
+            themeButton.setAttribute("aria-label", label);
+            themeButton.setAttribute("aria-pressed", String(theme === "dark"));
+            themeButton.innerHTML = `<i data-lucide="${icon}" aria-hidden="true"></i>`;
+
+            if (window.lucide) {
+                window.lucide.createIcons();
+            }
+        }
+
+        function applyTheme(theme, shouldStore = false) {
+            const activeTheme = theme === "dark" ? "dark" : "light";
+            document.documentElement.dataset.theme = activeTheme;
+            updateThemeButton(activeTheme);
+
+            if (shouldStore) {
+                setStoredTheme(activeTheme);
+            }
+        }
+
+        function normalizeLineEndings(text) {
+            return text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+        }
+
+        function countOutsideQuotes(text, char) {
+            let count = 0;
+            let inQuotes = false;
+
+            for (let index = 0; index < text.length; index += 1) {
+                const value = text[index];
+                const next = text[index + 1];
+
+                if (value === '"') {
+                    if (inQuotes && next === '"') {
+                        index += 1;
+                    } else {
+                        inQuotes = !inQuotes;
+                    }
+                } else if (!inQuotes && value === char) {
+                    count += 1;
+                }
+            }
+
+            return count;
+        }
+
+        function detectInputFormat(text) {
+            if (findMarkdownTable(normalizeLineEndings(text))) {
+                return "markdown";
+            }
+
+            const tabCount = countOutsideQuotes(text, "\t");
+            const commaCount = countOutsideQuotes(text, ",");
+
+            if (tabCount > 0 && tabCount >= commaCount) {
+                return "tsv";
+            }
+
+            return "csv";
+        }
+
+        function parseDelimited(text, delimiter) {
+            const rows = [];
+            let row = [];
+            let cell = "";
+            let inQuotes = false;
+            const normalized = normalizeLineEndings(text);
+
+            for (let index = 0; index < normalized.length; index += 1) {
+                const char = normalized[index];
+                const next = normalized[index + 1];
+
+                if (inQuotes) {
+                    if (char === '"' && next === '"') {
+                        cell += '"';
+                        index += 1;
+                    } else if (char === '"') {
+                        inQuotes = false;
+                    } else {
+                        cell += char;
+                    }
+                    continue;
+                }
+
+                if (char === '"' && cell === "") {
+                    inQuotes = true;
+                } else if (char === delimiter) {
+                    row.push(cell);
+                    cell = "";
+                } else if (char === "\n") {
+                    row.push(cell);
+                    rows.push(row);
+                    row = [];
+                    cell = "";
+                } else {
+                    cell += char;
+                }
+            }
+
+            if (cell !== "" || row.length > 0 || normalized.endsWith(delimiter)) {
+                row.push(cell);
+                rows.push(row);
+            }
+
+            return rows;
+        }
+
+        function splitMarkdownRow(line) {
+            let value = line.trim();
+
+            if (value.startsWith("|")) {
+                value = value.slice(1);
+            }
+
+            if (endsWithUnescapedPipe(value)) {
+                value = value.slice(0, -1);
+            }
+
+            const cells = [];
+            let cell = "";
+
+            for (let index = 0; index < value.length; index += 1) {
+                const char = value[index];
+                const next = value[index + 1];
+
+                if (char === "\\" && next === "|") {
+                    cell += "|";
+                    index += 1;
+                } else if (char === "|") {
+                    cells.push(cell);
+                    cell = "";
+                } else {
+                    cell += char;
+                }
+            }
+
+            cells.push(cell);
+            return cells;
+        }
+
+        function endsWithUnescapedPipe(value) {
+            if (!value.endsWith("|")) {
+                return false;
+            }
+
+            let backslashes = 0;
+            for (let index = value.length - 2; index >= 0 && value[index] === "\\"; index -= 1) {
+                backslashes += 1;
+            }
+
+            return backslashes % 2 === 0;
+        }
+
+        function isMarkdownSeparator(cells) {
+            return cells.length > 0 && cells.every((cell) => /^:?-{3,}:?$/.test(cell.trim()));
+        }
+
+        function findMarkdownTable(text) {
+            const lines = normalizeLineEndings(text)
+                .split("\n")
+                .map((line) => line.trim())
+                .filter(Boolean);
+
+            for (let index = 0; index < lines.length - 1; index += 1) {
+                const current = splitMarkdownRow(lines[index]);
+                const next = splitMarkdownRow(lines[index + 1]);
+
+                if (current.length > 1 && isMarkdownSeparator(next)) {
+                    return { lines, start: index };
+                }
+            }
+
+            return null;
+        }
+
+        function parseMarkdown(text) {
+            const table = findMarkdownTable(text);
+
+            if (table) {
+                const rows = [splitMarkdownRow(table.lines[table.start])];
+
+                for (let index = table.start + 2; index < table.lines.length; index += 1) {
+                    if (!table.lines[index].includes("|")) {
+                        break;
+                    }
+                    rows.push(splitMarkdownRow(table.lines[index]));
+                }
+
+                return rows;
+            }
+
+            return normalizeLineEndings(text)
+                .split("\n")
+                .map((line) => line.trim())
+                .filter(Boolean)
+                .map(splitMarkdownRow)
+                .filter((row) => row.length > 1);
+        }
+
+        function normalizeGrid(rows) {
+            const cleaned = rows
+                .map((row) => row.map((cell) => {
+                    const value = String(cell ?? "");
+                    return state.trimCells ? value.trim() : value;
+                }))
+                .filter((row) => row.some((cell) => cell !== ""));
+
+            const columnCount = cleaned.reduce((max, row) => Math.max(max, row.length), 0);
+
+            return cleaned.map((row) => {
+                const next = row.slice();
+                while (next.length < columnCount) {
+                    next.push("");
+                }
+                return next;
+            });
+        }
+
+        function parseInput(text) {
+            if (!text.trim()) {
+                return { format: "auto", grid: [] };
+            }
+
+            const format = state.inputFormat === "auto" ? detectInputFormat(text) : state.inputFormat;
+            const rows = format === "markdown"
+                ? parseMarkdown(text)
+                : parseDelimited(text, format === "tsv" ? "\t" : ",");
+
+            return { format, grid: normalizeGrid(rows) };
+        }
+
+        function escapeDelimitedCell(value, delimiter) {
+            const text = String(value ?? "");
+            const mustQuote = text.includes(delimiter) || text.includes('"') || text.includes("\n") || text.includes("\r");
+
+            if (!mustQuote) {
+                return text;
+            }
+
+            return `"${text.replace(/"/g, '""')}"`;
+        }
+
+        function serializeDelimited(grid, delimiter) {
+            return grid
+                .map((row) => row.map((cell) => escapeDelimitedCell(cell, delimiter)).join(delimiter))
+                .join("\n");
+        }
+
+        function escapeMarkdownCell(value) {
+            return String(value ?? "")
+                .replace(/\r?\n/g, "<br>")
+                .replace(/\|/g, "\\|");
+        }
+
+        function serializeMarkdown(grid) {
+            if (!grid.length) {
+                return "";
+            }
+
+            const columnCount = grid[0].length;
+            const header = state.firstRowHeader
+                ? grid[0]
+                : Array.from({ length: columnCount }, (_, index) => `Column ${index + 1}`);
+            const body = state.firstRowHeader ? grid.slice(1) : grid;
+            const rows = [header, ...body].map((row) => row.map(escapeMarkdownCell));
+            const widths = Array.from({ length: columnCount }, (_, columnIndex) => {
+                if (!state.padMarkdown) {
+                    return 3;
+                }
+
+                return Math.max(
+                    3,
+                    ...rows.map((row) => (row[columnIndex] ?? "").length)
+                );
+            });
+
+            const formatRow = (row) => {
+                const cells = widths.map((width, columnIndex) => {
+                    const cell = row[columnIndex] ?? "";
+                    return state.padMarkdown ? ` ${cell.padEnd(width, " ")} ` : ` ${cell} `;
+                });
+
+                return `|${cells.join("|")}|`;
+            };
+
+            const separator = `|${widths.map((width) => ` ${"-".repeat(width)} `).join("|")}|`;
+            return [formatRow(rows[0]), separator, ...rows.slice(1).map(formatRow)].join("\n");
+        }
+
+        function serializeOutput(grid, format) {
+            if (format === "markdown") {
+                return serializeMarkdown(grid);
+            }
+
+            return serializeDelimited(grid, format === "tsv" ? "\t" : ",");
+        }
+
+        function updateSegments(buttons, selectedValue, attribute) {
+            buttons.forEach((button) => {
+                button.setAttribute("aria-pressed", String(button.dataset[attribute] === selectedValue));
+            });
+        }
+
+        function update() {
+            const parsed = parseInput(inputText.value);
+            state.grid = parsed.grid;
+            state.detectedFormat = parsed.format;
+            outputText.value = serializeOutput(state.grid, state.outputFormat);
+
+            const rows = state.grid.length;
+            const columns = rows ? state.grid[0].length : 0;
+            inputStatus.textContent = rows ? `${parsed.format.toUpperCase()} - ${rows} rows x ${columns} columns` : "";
+            previewStatus.textContent = rows ? `${rows} rows x ${columns} columns` : "";
+            renderPreview(state.grid);
+        }
+
+        function renderPreview(grid) {
+            preview.textContent = "";
+
+            if (!grid.length) {
+                const empty = document.createElement("div");
+                empty.className = "empty";
+                empty.textContent = "Paste table data to preview it here.";
+                preview.append(empty);
+                return;
+            }
+
+            const table = document.createElement("table");
+            const thead = document.createElement("thead");
+            const tbody = document.createElement("tbody");
+            const headerRow = document.createElement("tr");
+            const corner = document.createElement("th");
+            corner.className = "row-number";
+            corner.textContent = "#";
+            headerRow.append(corner);
+
+            const columnCount = grid[0].length;
+            for (let columnIndex = 0; columnIndex < columnCount; columnIndex += 1) {
+                const th = document.createElement("th");
+                th.textContent = state.firstRowHeader && grid[0][columnIndex]
+                    ? grid[0][columnIndex]
+                    : `Column ${columnIndex + 1}`;
+                headerRow.append(th);
+            }
+
+            thead.append(headerRow);
+            table.append(thead);
+
+            const bodyRows = state.firstRowHeader ? grid.slice(1) : grid;
+            bodyRows.slice(0, 100).forEach((row, rowIndex) => {
+                const tr = document.createElement("tr");
+                const rowNumber = document.createElement("td");
+                rowNumber.className = "row-number";
+                rowNumber.textContent = String(rowIndex + 1);
+                tr.append(rowNumber);
+
+                row.forEach((cell) => {
+                    const td = document.createElement("td");
+                    td.textContent = cell;
+                    tr.append(td);
+                });
+
+                tbody.append(tr);
+            });
+
+            table.append(tbody);
+            preview.append(table);
+
+            if (bodyRows.length > 100) {
+                const note = document.createElement("div");
+                note.className = "empty";
+                note.textContent = `Preview limited to 100 of ${bodyRows.length} data rows.`;
+                preview.append(note);
+            }
+        }
+
+        async function copyText(text, label) {
+            if (!text) {
+                setMessage("Nothing to copy.");
+                return;
+            }
+
+            try {
+                if (navigator.clipboard && window.isSecureContext) {
+                    await navigator.clipboard.writeText(text);
+                } else {
+                    const helper = document.createElement("textarea");
+                    helper.value = text;
+                    helper.setAttribute("readonly", "");
+                    helper.style.position = "fixed";
+                    helper.style.opacity = "0";
+                    document.body.append(helper);
+                    helper.select();
+                    document.execCommand("copy");
+                    helper.remove();
+                }
+
+                setMessage(`${label} copied.`);
+            } catch (error) {
+                setMessage("Copy failed. Select the output text and copy it manually.");
+            }
+        }
+
+        function setMessage(text) {
+            message.textContent = text;
+
+            window.clearTimeout(setMessage.timer);
+            if (text) {
+                setMessage.timer = window.setTimeout(() => {
+                    message.textContent = "";
+                }, 3500);
+            }
+        }
+
+        function downloadOutput() {
+            const content = outputText.value;
+
+            if (!content) {
+                setMessage("Nothing to download.");
+                return;
+            }
+
+            const extensions = {
+                markdown: "md",
+                csv: "csv",
+                tsv: "tsv"
+            };
+            const mimeTypes = {
+                markdown: "text/markdown",
+                csv: "text/csv",
+                tsv: "text/tab-separated-values"
+            };
+            const blob = new Blob([content], { type: `${mimeTypes[state.outputFormat]};charset=utf-8` });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement("a");
+            link.href = url;
+            link.download = `table.${extensions[state.outputFormat]}`;
+            link.click();
+            URL.revokeObjectURL(url);
+            setMessage(`Downloaded table.${extensions[state.outputFormat]}.`);
+        }
+
+        inputText.addEventListener("input", update);
+        trimCells.addEventListener("change", () => {
+            state.trimCells = trimCells.checked;
+            update();
+        });
+        firstRowHeader.addEventListener("change", () => {
+            state.firstRowHeader = firstRowHeader.checked;
+            update();
+        });
+        padMarkdown.addEventListener("change", () => {
+            state.padMarkdown = padMarkdown.checked;
+            update();
+        });
+
+        inputFormatButtons.forEach((button) => {
+            button.addEventListener("click", () => {
+                state.inputFormat = button.dataset.inputFormat;
+                updateSegments(inputFormatButtons, state.inputFormat, "inputFormat");
+                update();
+            });
+        });
+
+        outputFormatButtons.forEach((button) => {
+            button.addEventListener("click", () => {
+                state.outputFormat = button.dataset.outputFormat;
+                updateSegments(outputFormatButtons, state.outputFormat, "outputFormat");
+                update();
+            });
+        });
+
+        themeButton.addEventListener("click", () => {
+            const nextTheme = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+            applyTheme(nextTheme, true);
+        });
+
+        function handleSystemThemeChange() {
+            if (!getStoredTheme()) {
+                applyTheme(getPreferredTheme());
+            }
+        }
+
+        if (systemThemeQuery?.addEventListener) {
+            systemThemeQuery.addEventListener("change", handleSystemThemeChange);
+        } else if (systemThemeQuery?.addListener) {
+            systemThemeQuery.addListener(handleSystemThemeChange);
+        }
+
+        sampleButton.addEventListener("click", () => {
+            inputText.value = sampleMarkdown;
+            inputText.focus();
+            update();
+        });
+
+        clearButton.addEventListener("click", () => {
+            inputText.value = "";
+            inputText.focus();
+            setMessage("");
+            update();
+        });
+
+        copyButton.addEventListener("click", () => copyText(outputText.value, "Output"));
+        copyTsvButton.addEventListener("click", () => {
+            copyText(serializeDelimited(state.grid, "\t"), "TSV");
+        });
+        downloadButton.addEventListener("click", downloadOutput);
+
+        applyTheme(getPreferredTheme());
+        update();
+
+        if (window.lucide) {
+            window.lucide.createIcons();
+        }
+    </script>
+</body>
+</html>
