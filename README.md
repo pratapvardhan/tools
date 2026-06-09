@@ -8,6 +8,7 @@ Some built with LLM assistance.
 
 - [Code Editor](code-editor/) - write, run and share code (html/js) in your browser.
 - [Markdown Preview](markdown-preview/) - write markdown and preview rendered HTML locally.
+- [Text Diff](text-diff/) - compare two text versions side by side.
 - [Table Format Converter](table-format-converter/) - convert Markdown tables, CSV, and TSV for clipboard, Sheets, and docs.
 - [CSV Merge](csv-merge/) - merge multiple CSV files.
 - [Local PDF](local-pdf/) - edit, merge, split, sign, crop, watermark, etc PDF files in your browser.
