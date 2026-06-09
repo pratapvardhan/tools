@@ -7,16 +7,16 @@ Some built with LLM assistance.
 ## Tools
 
 - [CSV Merge](csv-merge/) - merge multiple CSV files.
-- [PDF Splitter](pdf-splitter/) - split PDF files into multiple parts.
-- [Local PDF](local-pdf/) - edit PDF files in your browser.
+- [Local PDF](local-pdf/) - edit, merge, split, sign, crop, watermark, etc PDF files in your browser.
 - [Timezones](timezones/) - track time in multiple timezones.
 - [Code Editor](code-editor/) - write, run and share code (html/js) in your browser.
-- [Location Mapper](location-mapper/) - geocode locations and plot on map
-- [Image Color Quantizer](image-color-quantizer/) - reduce colors in an image by combining them to nearest ones.
+- [Location Mapper](location-mapper/) - geocode locations and plot on map.
+- [Image Color Quantizer](image-color-quantizer/) - reduce number of colors in an image by combining them to nearest ones.
 - [Image to Base64](image-to-base64/) - convert image to base64 string.
 - [Currency Converter](currency-converter/) - convert currencies.
 - [Nifty Returns](nifty-returns/) - monthly returns heatmap for Nifty indices.
-- [Notepad](notepad/) - write notes in your browser.
+- [Markdown Preview](markdown-preview/) - write markdown and preview rendered HTML locally.
+- [Notepad](notepad/) - using local storage, no tracking.
 - [Notes in Browser tab](https://pratapvardhan.com/notes/browser/note-taking/) - write notes in your browser.
 
 Helpful inspirations

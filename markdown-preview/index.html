@@ -5,7 +5,39 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="shortcut icon" href="https://pratapvardhan.com/assets/favicon.ico">
     <title>Markdown Preview</title>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
+    <script>
+        (() => {
+            const storageKey = "markdown-preview-theme";
+            let theme = "light";
+
+            try {
+                const savedTheme = localStorage.getItem(storageKey);
+                const prefersDark = window.matchMedia?.("(prefers-color-scheme: dark)").matches;
+                theme = savedTheme === "dark" || savedTheme === "light"
+                    ? savedTheme
+                    : prefersDark ? "dark" : "light";
+            } catch (error) {
+                theme = window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+            }
+
+            document.documentElement.dataset.theme = theme;
+            window.markdownPreviewInitialTheme = theme;
+        })();
+    </script>
+    <link rel="stylesheet" id="highlightLightTheme" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
+    <link rel="stylesheet" id="highlightDarkTheme" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css" disabled>
+    <script>
+        (() => {
+            const theme = window.markdownPreviewInitialTheme || "light";
+            const lightTheme = document.getElementById("highlightLightTheme");
+            const darkTheme = document.getElementById("highlightDarkTheme");
+
+            if (lightTheme && darkTheme) {
+                lightTheme.disabled = theme === "dark";
+                darkTheme.disabled = theme !== "dark";
+            }
+        })();
+    </script>
     <script src="https://cdn.jsdelivr.net/npm/markdown-it@14.1.0/dist/markdown-it.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
@@ -22,8 +54,35 @@
             --muted: #65706a;
             --accent: #146c5f;
             --accent-hover: #0f584d;
+            --on-accent: #ffffff;
             --danger: #a33c32;
+            --editor-bg: #fbfcfa;
+            --inline-code-bg: #eef2ef;
+            --code-bg: #f5f7f5;
+            --blockquote-text: #4f5f56;
+            --blockquote-border: #9fc4bc;
             --shadow: 0 1px 2px rgba(21, 27, 24, 0.08);
+        }
+
+        :root[data-theme="dark"] {
+            color-scheme: dark;
+            --bg: #151817;
+            --surface: #1f2422;
+            --surface-muted: #272f2b;
+            --border: #3c4741;
+            --border-strong: #526159;
+            --text: #ecefec;
+            --muted: #a7b3ac;
+            --accent: #59c7b3;
+            --accent-hover: #75d8c6;
+            --on-accent: #0d1715;
+            --danger: #f28b82;
+            --editor-bg: #171b19;
+            --inline-code-bg: #2a332f;
+            --code-bg: #181f1c;
+            --blockquote-text: #c4d1c9;
+            --blockquote-border: #4f8379;
+            --shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
         }
 
         * {
@@ -113,7 +172,7 @@
             z-index: 1;
             border-color: var(--accent);
             background: var(--accent);
-            color: #ffffff;
+            color: var(--on-accent);
         }
 
         .mobile-tab:focus-visible {
@@ -152,12 +211,12 @@
         .button.primary {
             border-color: var(--accent);
             background: var(--accent);
-            color: #ffffff;
+            color: var(--on-accent);
         }
 
         .button.primary:hover {
             background: var(--accent-hover);
-            color: #ffffff;
+            color: var(--on-accent);
         }
 
         .button.danger:hover {
@@ -169,6 +228,11 @@
             width: 0.9rem;
             height: 0.9rem;
             flex: 0 0 auto;
+        }
+
+        .button.icon-button {
+            width: 2rem;
+            padding-inline: 0;
         }
 
         .workspace {
@@ -225,7 +289,7 @@
             outline: 0;
             padding: 1rem;
             color: var(--text);
-            background: #fbfcfa;
+            background: var(--editor-bg);
             font: 0.95rem/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
             tab-size: 2;
         }
@@ -287,14 +351,14 @@
 
         .preview blockquote {
             padding: 0.1rem 0 0.1rem 1rem;
-            color: #4f5f56;
-            border-left: 4px solid #9fc4bc;
+            color: var(--blockquote-text);
+            border-left: 4px solid var(--blockquote-border);
         }
 
         .preview code {
             padding: 0.1rem 0.25rem;
             border-radius: 4px;
-            background: #eef2ef;
+            background: var(--inline-code-bg);
             font: 0.9em/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
         }
 
@@ -303,7 +367,7 @@
             padding: 0.9rem 1rem;
             border: 1px solid var(--border);
             border-radius: 6px;
-            background: #f5f7f5;
+            background: var(--code-bg);
         }
 
         .preview pre code {
@@ -414,6 +478,10 @@
                 padding-inline: 0.45rem;
             }
 
+            .button.icon-button {
+                width: 100%;
+            }
+
             .status {
                 min-width: 0;
                 white-space: normal;
@@ -426,6 +494,9 @@
         <header class="topbar">
             <h1>Markdown Preview</h1>
             <div class="actions" aria-label="Markdown actions">
+                <button class="button icon-button" type="button" id="themeButton" title="Switch to dark mode" aria-label="Switch to dark mode" aria-pressed="false">
+                    <i data-lucide="moon" aria-hidden="true"></i>
+                </button>
                 <button class="button" type="button" id="openFileButton" title="Open Markdown file">
                     <i data-lucide="folder-open" aria-hidden="true"></i>
                     <span>Open</span>
@@ -487,6 +558,7 @@
 
     <script>
         const storageKey = "markdown-preview-content";
+        const themeStorageKey = "markdown-preview-theme";
         const defaultMarkdown = `# Markdown Preview
 
 Write Markdown on the left and see the rendered output here.
@@ -523,6 +595,10 @@ function greet(name) {
         const copyHtmlButton = document.getElementById("copyHtmlButton");
         const sampleButton = document.getElementById("sampleButton");
         const clearButton = document.getElementById("clearButton");
+        const themeButton = document.getElementById("themeButton");
+        const highlightLightTheme = document.getElementById("highlightLightTheme");
+        const highlightDarkTheme = document.getElementById("highlightDarkTheme");
+        const systemThemeQuery = window.matchMedia?.("(prefers-color-scheme: dark)") || null;
         const viewTabs = Array.from(document.querySelectorAll(".mobile-tab"));
         const viewPanes = Array.from(document.querySelectorAll(".pane[data-view]"));
 
@@ -543,6 +619,72 @@ function greet(name) {
                 return md.utils.escapeHtml(code);
             },
         });
+
+        function getStoredTheme() {
+            try {
+                const savedTheme = localStorage.getItem(themeStorageKey);
+                return savedTheme === "dark" || savedTheme === "light" ? savedTheme : null;
+            } catch (error) {
+                return null;
+            }
+        }
+
+        function setStoredTheme(theme) {
+            try {
+                localStorage.setItem(themeStorageKey, theme);
+            } catch (error) {
+                return;
+            }
+        }
+
+        function getPreferredTheme() {
+            const storedTheme = getStoredTheme();
+
+            if (storedTheme) {
+                return storedTheme;
+            }
+
+            if (systemThemeQuery) {
+                return systemThemeQuery.matches ? "dark" : "light";
+            }
+
+            return window.markdownPreviewInitialTheme || "light";
+        }
+
+        function updateHighlightTheme(theme) {
+            if (!highlightLightTheme || !highlightDarkTheme) {
+                return;
+            }
+
+            highlightLightTheme.disabled = theme === "dark";
+            highlightDarkTheme.disabled = theme !== "dark";
+        }
+
+        function updateThemeButton(theme) {
+            const nextTheme = theme === "dark" ? "light" : "dark";
+            const icon = theme === "dark" ? "sun" : "moon";
+            const label = `Switch to ${nextTheme} mode`;
+
+            themeButton.title = label;
+            themeButton.setAttribute("aria-label", label);
+            themeButton.setAttribute("aria-pressed", String(theme === "dark"));
+            themeButton.innerHTML = `<i data-lucide="${icon}" aria-hidden="true"></i>`;
+
+            if (window.lucide) {
+                lucide.createIcons();
+            }
+        }
+
+        function applyTheme(theme, shouldStore = false) {
+            const activeTheme = theme === "dark" ? "dark" : "light";
+            document.documentElement.dataset.theme = activeTheme;
+            updateHighlightTheme(activeTheme);
+            updateThemeButton(activeTheme);
+
+            if (shouldStore) {
+                setStoredTheme(activeTheme);
+            }
+        }
 
         function render() {
             const markdown = editor.value;
@@ -809,6 +951,8 @@ function greet(name) {
             });
         }
 
+        applyTheme(getPreferredTheme());
+
         editor.addEventListener("input", render);
 
         editor.addEventListener("keydown", (event) => {
@@ -840,6 +984,23 @@ function greet(name) {
 
         openFileButton.addEventListener("click", () => fileInput.click());
         printPdfButton.addEventListener("click", exportPdf);
+        themeButton.addEventListener("click", () => {
+            const nextTheme = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+            applyTheme(nextTheme, true);
+        });
+
+        function handleSystemThemeChange() {
+            if (!getStoredTheme()) {
+                applyTheme(getPreferredTheme());
+            }
+        }
+
+        if (systemThemeQuery?.addEventListener) {
+            systemThemeQuery.addEventListener("change", handleSystemThemeChange);
+        } else if (systemThemeQuery?.addListener) {
+            systemThemeQuery.addListener(handleSystemThemeChange);
+        }
+
         fileInput.addEventListener("change", () => {
             const [file] = fileInput.files;
             if (file) {
