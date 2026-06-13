@@ -1,0 +1,1793 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="shortcut icon" href="https://pratapvardhan.com/assets/favicon.ico">
+    <title>JSON Viewer</title>
+    <script>
+        (() => {
+            const storageKey = "json-viewer-theme";
+            let theme = "light";
+
+            try {
+                const savedTheme = localStorage.getItem(storageKey);
+                const prefersDark = window.matchMedia?.("(prefers-color-scheme: dark)").matches;
+                theme = savedTheme === "dark" || savedTheme === "light"
+                    ? savedTheme
+                    : prefersDark ? "dark" : "light";
+            } catch (error) {
+                theme = window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+            }
+
+            document.documentElement.dataset.theme = theme;
+            window.jsonViewerInitialTheme = theme;
+        })();
+    </script>
+    <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
+    <style>
+        :root {
+            color-scheme: light;
+            --bg: #f6f7f4;
+            --surface: #ffffff;
+            --surface-muted: #f1f4f2;
+            --editor-bg: #fbfcfa;
+            --border: #d8ded7;
+            --border-strong: #aeb9ad;
+            --text: #202521;
+            --muted: #637069;
+            --accent: #2563eb;
+            --accent-hover: #1d4ed8;
+            --accent-soft: #eaf1ff;
+            --on-accent: #ffffff;
+            --danger: #a33b34;
+            --warn: #956216;
+            --success: #197342;
+            --match: #fff3b0;
+            --current-match: #f59e0b;
+            --string: #167447;
+            --number: #9a5b10;
+            --boolean: #245dcc;
+            --null: #78716c;
+            --object: #7c3aed;
+            --array: #0f766e;
+            --shadow: 0 1px 2px rgba(20, 28, 22, 0.08);
+        }
+
+        :root[data-theme="dark"] {
+            color-scheme: dark;
+            --bg: #151817;
+            --surface: #1f2422;
+            --surface-muted: #252b2a;
+            --editor-bg: #171b19;
+            --border: #3d4741;
+            --border-strong: #526159;
+            --text: #edf0ed;
+            --muted: #a8b3ad;
+            --accent: #60a5fa;
+            --accent-hover: #93c5fd;
+            --accent-soft: #17243f;
+            --on-accent: #0d1715;
+            --danger: #f08b80;
+            --warn: #f2b56b;
+            --success: #7ee0a1;
+            --match: #554817;
+            --current-match: #fbbf24;
+            --string: #7ee0a1;
+            --number: #f0b76b;
+            --boolean: #93c5fd;
+            --null: #b7aaa0;
+            --object: #c4b5fd;
+            --array: #5eead4;
+            --shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            min-height: 100%;
+        }
+
+        body {
+            margin: 0;
+            min-width: 320px;
+            background: var(--bg);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            line-height: 1.5;
+        }
+
+        button,
+        input,
+        textarea {
+            font: inherit;
+        }
+
+        button {
+            border: 0;
+        }
+
+        .app {
+            min-height: 100vh;
+            display: grid;
+            grid-template-rows: auto auto minmax(0, 1fr) auto;
+        }
+
+        .topbar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            padding: 0.85rem 1rem;
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            box-shadow: var(--shadow);
+        }
+
+        .title-block {
+            min-width: 0;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.05rem;
+            font-weight: 700;
+            letter-spacing: 0;
+        }
+
+        .subtitle {
+            margin: 0.15rem 0 0;
+            color: var(--muted);
+            font-size: 0.88rem;
+        }
+
+        .actions,
+        .panel-actions,
+        .control-group,
+        .search-group,
+        .format-row {
+            display: flex;
+            align-items: center;
+            gap: 0.45rem;
+            flex-wrap: wrap;
+        }
+
+        .button,
+        .segment {
+            min-height: 2.1rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.35rem;
+            padding: 0.35rem 0.65rem;
+            border: 1px solid var(--border-strong);
+            border-radius: 6px;
+            background: var(--surface);
+            color: var(--text);
+            cursor: pointer;
+            font-size: 0.9rem;
+            white-space: nowrap;
+        }
+
+        .button:hover,
+        .segment:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .button:focus-visible,
+        .segment:focus-visible,
+        input:focus-visible,
+        textarea:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+
+        .button:disabled,
+        .segment:disabled,
+        input:disabled {
+            cursor: not-allowed;
+            opacity: 0.55;
+        }
+
+        .button.primary {
+            border-color: var(--accent);
+            background: var(--accent);
+            color: var(--on-accent);
+        }
+
+        .button.primary:hover {
+            background: var(--accent-hover);
+            color: var(--on-accent);
+        }
+
+        .button.danger:hover {
+            border-color: var(--danger);
+            color: var(--danger);
+        }
+
+        .button svg,
+        .segment svg {
+            width: 0.95rem;
+            height: 0.95rem;
+            flex: 0 0 auto;
+        }
+
+        .button.icon-button {
+            width: 2.1rem;
+            padding-inline: 0;
+        }
+
+        .controls {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.9rem;
+            padding: 0.75rem 1rem;
+            background: var(--surface-muted);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .control-label {
+            color: var(--muted);
+            font-size: 0.8rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            white-space: nowrap;
+        }
+
+        .segmented {
+            display: inline-flex;
+            align-items: stretch;
+            flex-wrap: nowrap;
+        }
+
+        .segment {
+            border-radius: 0;
+            font-weight: 650;
+        }
+
+        .segment:first-child {
+            border-radius: 6px 0 0 6px;
+        }
+
+        .segment:last-child {
+            border-radius: 0 6px 6px 0;
+        }
+
+        .segment + .segment {
+            margin-left: -1px;
+        }
+
+        .segment[aria-pressed="true"] {
+            position: relative;
+            z-index: 1;
+            border-color: var(--accent);
+            background: var(--accent);
+            color: var(--on-accent);
+        }
+
+        .search-group {
+            flex: 1 1 18rem;
+            min-width: 15rem;
+            justify-content: center;
+        }
+
+        .search-wrap {
+            position: relative;
+            flex: 1 1 14rem;
+            min-width: 12rem;
+        }
+
+        .search-wrap svg {
+            position: absolute;
+            left: 0.6rem;
+            top: 50%;
+            width: 0.95rem;
+            height: 0.95rem;
+            color: var(--muted);
+            transform: translateY(-50%);
+            pointer-events: none;
+        }
+
+        .search-input {
+            width: 100%;
+            min-height: 2.1rem;
+            padding: 0.35rem 0.7rem 0.35rem 2rem;
+            border: 1px solid var(--border-strong);
+            border-radius: 6px;
+            background: var(--surface);
+            color: var(--text);
+            font-size: 0.9rem;
+        }
+
+        .match-count {
+            min-width: 4.5rem;
+            color: var(--muted);
+            font-size: 0.82rem;
+            text-align: center;
+            white-space: nowrap;
+        }
+
+        .workspace {
+            min-height: 0;
+            display: grid;
+            grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+            gap: 1rem;
+            padding: 1rem;
+        }
+
+        .panel {
+            min-width: 0;
+            min-height: 0;
+            display: grid;
+            grid-template-rows: auto minmax(0, 1fr);
+            overflow: hidden;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--surface);
+            box-shadow: var(--shadow);
+        }
+
+        .panel.is-dragging {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-soft);
+        }
+
+        .panel-header {
+            min-height: 2.8rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.75rem;
+            padding: 0.55rem 0.75rem;
+            border-bottom: 1px solid var(--border);
+            background: var(--surface-muted);
+        }
+
+        .panel-title {
+            margin: 0;
+            font-size: 0.9rem;
+            font-weight: 700;
+            letter-spacing: 0;
+            white-space: nowrap;
+        }
+
+        .status {
+            min-height: 1.2rem;
+            color: var(--muted);
+            font-size: 0.8rem;
+            text-align: right;
+        }
+
+        .status.ok {
+            color: var(--success);
+        }
+
+        .status.error {
+            color: var(--danger);
+        }
+
+        textarea {
+            width: 100%;
+            height: 100%;
+            min-height: 32rem;
+            resize: none;
+            border: 0;
+            outline: 0;
+            padding: 1rem;
+            color: var(--text);
+            background: var(--editor-bg);
+            font: 0.92rem/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            tab-size: 2;
+        }
+
+        .tree-shell {
+            min-height: 0;
+            display: grid;
+            grid-template-rows: auto minmax(0, 1fr);
+            overflow: hidden;
+            background: var(--surface);
+        }
+
+        .stats {
+            display: flex;
+            align-items: center;
+            gap: 0.45rem;
+            flex-wrap: wrap;
+            min-height: 2.7rem;
+            padding: 0.55rem 0.75rem;
+            border-bottom: 1px solid var(--border);
+            background: var(--surface);
+        }
+
+        .chip {
+            display: inline-flex;
+            align-items: center;
+            min-height: 1.55rem;
+            padding: 0.15rem 0.45rem;
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            color: var(--muted);
+            background: var(--surface-muted);
+            font-size: 0.78rem;
+            white-space: nowrap;
+        }
+
+        .tree-wrap {
+            min-height: 0;
+            overflow: auto;
+            padding: 0.75rem;
+        }
+
+        .tree,
+        .tree ul {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+
+        .tree ul {
+            margin-left: 1rem;
+            padding-left: 0.55rem;
+            border-left: 1px solid var(--border);
+        }
+
+        .tree li {
+            min-width: max-content;
+        }
+
+        details > summary {
+            list-style: none;
+        }
+
+        details > summary::-webkit-details-marker {
+            display: none;
+        }
+
+        .tree-row {
+            min-height: 1.8rem;
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            padding: 0.13rem 0.25rem;
+            border-radius: 6px;
+            color: var(--text);
+            font: 0.86rem/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        }
+
+        .tree-row:hover,
+        .tree-row:focus-within {
+            background: var(--surface-muted);
+        }
+
+        .tree-row.is-match {
+            background: var(--match);
+        }
+
+        .tree-row.is-current {
+            outline: 2px solid var(--current-match);
+            outline-offset: 1px;
+        }
+
+        .twisty,
+        .leaf-spacer {
+            width: 1rem;
+            flex: 0 0 1rem;
+            color: var(--muted);
+            text-align: center;
+        }
+
+        .twisty::before {
+            content: ">";
+            font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            font-size: 0.76rem;
+        }
+
+        details[open] > summary .twisty::before {
+            content: "v";
+        }
+
+        .key {
+            color: var(--text);
+            font-weight: 700;
+        }
+
+        .separator,
+        .meta {
+            color: var(--muted);
+        }
+
+        .value,
+        .preview {
+            overflow-wrap: anywhere;
+        }
+
+        .type-string .value {
+            color: var(--string);
+        }
+
+        .type-number .value {
+            color: var(--number);
+        }
+
+        .type-boolean .value {
+            color: var(--boolean);
+        }
+
+        .type-null .value {
+            color: var(--null);
+        }
+
+        .type-object .meta {
+            color: var(--object);
+        }
+
+        .type-array .meta {
+            color: var(--array);
+        }
+
+        .node-actions {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            margin-left: 0.25rem;
+            opacity: 0;
+            transition: opacity 0.12s ease;
+        }
+
+        .tree-row:hover .node-actions,
+        .tree-row:focus-within .node-actions {
+            opacity: 1;
+        }
+
+        .mini-button {
+            min-height: 1.35rem;
+            padding: 0.05rem 0.35rem;
+            border: 1px solid var(--border);
+            border-radius: 5px;
+            background: var(--surface);
+            color: var(--muted);
+            cursor: pointer;
+            font-size: 0.72rem;
+            line-height: 1;
+        }
+
+        .mini-button:hover,
+        .mini-button:focus-visible {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .empty,
+        .error-card {
+            min-height: 16rem;
+            display: grid;
+            place-items: center;
+            padding: 1rem;
+            color: var(--muted);
+            text-align: center;
+        }
+
+        .error-card {
+            align-content: center;
+            gap: 0.25rem;
+            color: var(--danger);
+        }
+
+        .error-card h2 {
+            margin: 0;
+            font-size: 1rem;
+            letter-spacing: 0;
+        }
+
+        .error-card p {
+            max-width: 34rem;
+            margin: 0;
+            color: var(--muted);
+            overflow-wrap: anywhere;
+        }
+
+        .footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+            padding: 0.7rem 1rem;
+            border-top: 1px solid var(--border);
+            color: var(--muted);
+            background: var(--surface);
+            font-size: 0.82rem;
+        }
+
+        .toast {
+            position: fixed;
+            right: 1rem;
+            bottom: 1rem;
+            z-index: 10;
+            max-width: min(24rem, calc(100vw - 2rem));
+            padding: 0.65rem 0.8rem;
+            border: 1px solid var(--border);
+            border-left: 4px solid var(--accent);
+            border-radius: 6px;
+            background: var(--surface);
+            color: var(--text);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+            font-size: 0.86rem;
+            opacity: 0;
+            transform: translateY(0.5rem);
+            pointer-events: none;
+            transition: opacity 0.16s ease, transform 0.16s ease;
+        }
+
+        .toast.is-visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .toast.error {
+            border-left-color: var(--danger);
+        }
+
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+
+        @media (max-width: 1080px) {
+            .topbar,
+            .controls {
+                align-items: stretch;
+                flex-direction: column;
+            }
+
+            .actions,
+            .control-group,
+            .format-row,
+            .search-group {
+                justify-content: flex-start;
+            }
+
+            .workspace {
+                grid-template-columns: 1fr;
+            }
+
+            textarea,
+            .tree-wrap {
+                min-height: 24rem;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .topbar,
+            .controls,
+            .workspace {
+                padding: 0.75rem;
+            }
+
+            .actions,
+            .panel-actions,
+            .control-group,
+            .format-row,
+            .search-group,
+            .search-wrap {
+                width: 100%;
+            }
+
+            .actions {
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+
+            .button,
+            .button.icon-button {
+                width: 100%;
+                padding-inline: 0.45rem;
+            }
+
+            .segmented {
+                width: 100%;
+            }
+
+            .segment {
+                flex: 1 1 0;
+                min-width: 0;
+                padding-inline: 0.35rem;
+            }
+
+            .panel-header,
+            .footer {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+
+            .status,
+            .match-count {
+                text-align: left;
+            }
+
+            .node-actions {
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main class="app">
+        <header class="topbar">
+            <div class="title-block">
+                <h1>JSON Viewer</h1>
+                <p class="subtitle">View JSON data as a searchable tree.</p>
+            </div>
+            <div class="actions" aria-label="JSON actions">
+                <button class="button icon-button" type="button" id="themeButton" title="Switch to dark mode" aria-label="Switch to dark mode" aria-pressed="false">
+                    <i data-lucide="moon" aria-hidden="true"></i>
+                </button>
+                <button class="button" type="button" id="openFileButton" title="Open JSON file">
+                    <i data-lucide="folder-open" aria-hidden="true"></i>
+                    <span>Open</span>
+                </button>
+                <button class="button" type="button" id="sampleButton" title="Load sample JSON">
+                    <i data-lucide="file-text" aria-hidden="true"></i>
+                    <span>Sample</span>
+                </button>
+                <button class="button danger" type="button" id="clearButton" title="Clear input">
+                    <i data-lucide="trash-2" aria-hidden="true"></i>
+                    <span>Clear</span>
+                </button>
+            </div>
+        </header>
+
+        <section class="controls" aria-label="Tree and output controls">
+            <div class="control-group">
+                <span class="control-label">Depth</span>
+                <div class="segmented" role="group" aria-label="Expansion depth">
+                    <button class="segment" type="button" data-depth="collapse" aria-pressed="false">Collapse</button>
+                    <button class="segment" type="button" data-depth="1" aria-pressed="false">1</button>
+                    <button class="segment" type="button" data-depth="2" aria-pressed="true">2</button>
+                    <button class="segment" type="button" data-depth="3" aria-pressed="false">3</button>
+                    <button class="segment" type="button" data-depth="all" aria-pressed="false">All</button>
+                </div>
+            </div>
+
+            <div class="search-group">
+                <label class="sr-only" for="searchInput">Search keys and values</label>
+                <div class="search-wrap">
+                    <i data-lucide="search" aria-hidden="true"></i>
+                    <input class="search-input" id="searchInput" type="search" placeholder="Search keys and values" autocomplete="off" disabled>
+                </div>
+                <button class="button icon-button" type="button" id="previousMatchButton" title="Previous match" aria-label="Previous match" disabled>
+                    <i data-lucide="chevron-up" aria-hidden="true"></i>
+                </button>
+                <button class="button icon-button" type="button" id="nextMatchButton" title="Next match" aria-label="Next match" disabled>
+                    <i data-lucide="chevron-down" aria-hidden="true"></i>
+                </button>
+                <button class="button icon-button" type="button" id="clearSearchButton" title="Clear search" aria-label="Clear search" disabled>
+                    <i data-lucide="x" aria-hidden="true"></i>
+                </button>
+                <span class="match-count" id="matchCount" aria-live="polite">No search</span>
+            </div>
+
+            <div class="format-row">
+                <div class="segmented" role="group" aria-label="Copy and download format">
+                    <button class="segment" type="button" data-output-mode="pretty" aria-pressed="true">Pretty</button>
+                    <button class="segment" type="button" data-output-mode="minified" aria-pressed="false">Minified</button>
+                </div>
+                <button class="button" type="button" id="copyJsonButton" title="Copy JSON" disabled>
+                    <i data-lucide="copy" aria-hidden="true"></i>
+                    <span>Copy</span>
+                </button>
+                <button class="button" type="button" id="downloadJsonButton" title="Download JSON" disabled>
+                    <i data-lucide="download" aria-hidden="true"></i>
+                    <span>Download</span>
+                </button>
+            </div>
+        </section>
+
+        <section class="workspace">
+            <section class="panel" id="inputPanel" aria-label="JSON input">
+                <div class="panel-header">
+                    <h2 class="panel-title">Input</h2>
+                    <div class="panel-actions">
+                        <button class="button" type="button" id="formatInputButton" title="Format input JSON" disabled>
+                            <i data-lucide="align-left" aria-hidden="true"></i>
+                            <span>Format</span>
+                        </button>
+                        <button class="button" type="button" id="minifyInputButton" title="Minify input JSON" disabled>
+                            <i data-lucide="wrap-text" aria-hidden="true"></i>
+                            <span>Minify</span>
+                        </button>
+                    </div>
+                </div>
+                <textarea id="jsonInput" spellcheck="false" placeholder='Paste JSON here, or drop a .json file.' aria-label="JSON input"></textarea>
+            </section>
+
+            <section class="panel" aria-label="JSON tree output">
+                <div class="panel-header">
+                    <h2 class="panel-title">Tree</h2>
+                    <div class="status" id="outputStatus" aria-live="polite">Waiting for JSON</div>
+                </div>
+                <div class="tree-shell">
+                    <div class="stats" id="statsBar" aria-label="JSON statistics"></div>
+                    <div class="tree-wrap" id="treeWrap">
+                        <div class="empty">Paste JSON or open a file to view it.</div>
+                    </div>
+                </div>
+            </section>
+        </section>
+
+        <footer class="footer">
+            <span>All processing happens in your browser.</span>
+            <span>Files never leave your device. Large files may be slow.</span>
+        </footer>
+    </main>
+
+    <input class="sr-only" type="file" id="fileInput" accept="application/json,.json">
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script>
+        const storageKey = "json-viewer-theme";
+        const renderLimit = 12000;
+        const sampleJson = JSON.stringify({
+            project: "JSON Viewer",
+            generatedAt: "2026-06-13T09:30:00Z",
+            owner: {
+                name: "Pratap",
+                timezone: "Asia/Kolkata",
+                active: true
+            },
+            releases: [
+                {
+                    version: "1.0.0",
+                    date: "2026-06-13",
+                    changes: ["Tree view", "Search", "Copy paths"]
+                },
+                {
+                    version: "1.1.0",
+                    date: null,
+                    changes: ["Drag and drop", "Stats"]
+                }
+            ],
+            metrics: {
+                users: 1280,
+                loadTimeMs: 42.8,
+                errorRate: 0.002
+            }
+        }, null, 2);
+
+        const state = {
+            value: null,
+            valid: false,
+            rawText: "",
+            formattedText: "",
+            minifiedText: "",
+            currentFileName: "",
+            expandMode: "2",
+            outputMode: "pretty",
+            searchTerm: "",
+            matchList: [],
+            matchPaths: new Set(),
+            ancestorPaths: new Set(),
+            currentMatchIndex: 0,
+            stats: null,
+            renderedNodes: 0
+        };
+
+        const refs = {};
+        let parseTimer = 0;
+        let toastTimer = 0;
+
+        document.addEventListener("DOMContentLoaded", () => {
+            cacheElements();
+            bindEvents();
+            setTheme(window.jsonViewerInitialTheme || document.documentElement.dataset.theme || "light", false);
+            renderEmpty();
+            updateControls();
+            refreshIcons();
+        });
+
+        function cacheElements() {
+            refs.themeButton = document.getElementById("themeButton");
+            refs.openFileButton = document.getElementById("openFileButton");
+            refs.fileInput = document.getElementById("fileInput");
+            refs.sampleButton = document.getElementById("sampleButton");
+            refs.clearButton = document.getElementById("clearButton");
+            refs.inputPanel = document.getElementById("inputPanel");
+            refs.input = document.getElementById("jsonInput");
+            refs.formatInputButton = document.getElementById("formatInputButton");
+            refs.minifyInputButton = document.getElementById("minifyInputButton");
+            refs.outputStatus = document.getElementById("outputStatus");
+            refs.statsBar = document.getElementById("statsBar");
+            refs.treeWrap = document.getElementById("treeWrap");
+            refs.searchInput = document.getElementById("searchInput");
+            refs.previousMatchButton = document.getElementById("previousMatchButton");
+            refs.nextMatchButton = document.getElementById("nextMatchButton");
+            refs.clearSearchButton = document.getElementById("clearSearchButton");
+            refs.matchCount = document.getElementById("matchCount");
+            refs.copyJsonButton = document.getElementById("copyJsonButton");
+            refs.downloadJsonButton = document.getElementById("downloadJsonButton");
+            refs.toast = document.getElementById("toast");
+        }
+
+        function bindEvents() {
+            refs.themeButton.addEventListener("click", () => {
+                const currentTheme = document.documentElement.dataset.theme === "dark" ? "dark" : "light";
+                setTheme(currentTheme === "dark" ? "light" : "dark", true);
+            });
+
+            refs.openFileButton.addEventListener("click", () => refs.fileInput.click());
+            refs.fileInput.addEventListener("change", () => {
+                const file = refs.fileInput.files?.[0];
+                if (file) {
+                    readJsonFile(file);
+                }
+                refs.fileInput.value = "";
+            });
+
+            refs.sampleButton.addEventListener("click", () => {
+                state.currentFileName = "";
+                refs.input.value = sampleJson;
+                parseNow();
+                showToast("Sample JSON loaded.");
+                refs.input.focus();
+            });
+
+            refs.clearButton.addEventListener("click", () => {
+                state.currentFileName = "";
+                refs.input.value = "";
+                refs.searchInput.value = "";
+                parseNow();
+                showToast("Input cleared.");
+                refs.input.focus();
+            });
+
+            refs.input.addEventListener("input", () => scheduleParse());
+            refs.formatInputButton.addEventListener("click", () => replaceInputWith("pretty"));
+            refs.minifyInputButton.addEventListener("click", () => replaceInputWith("minified"));
+
+            refs.searchInput.addEventListener("input", () => {
+                state.searchTerm = refs.searchInput.value.trim();
+                state.currentMatchIndex = 0;
+                renderTree({ scrollCurrent: Boolean(state.searchTerm) });
+            });
+
+            refs.previousMatchButton.addEventListener("click", () => moveSearchMatch(-1));
+            refs.nextMatchButton.addEventListener("click", () => moveSearchMatch(1));
+            refs.clearSearchButton.addEventListener("click", () => {
+                refs.searchInput.value = "";
+                state.searchTerm = "";
+                state.currentMatchIndex = 0;
+                renderTree();
+                refs.searchInput.focus();
+            });
+
+            document.querySelectorAll("[data-depth]").forEach((button) => {
+                button.addEventListener("click", () => {
+                    state.expandMode = button.dataset.depth;
+                    updateDepthControls();
+                    renderTree();
+                });
+            });
+
+            document.querySelectorAll("[data-output-mode]").forEach((button) => {
+                button.addEventListener("click", () => {
+                    state.outputMode = button.dataset.outputMode;
+                    updateOutputModeControls();
+                });
+            });
+
+            refs.copyJsonButton.addEventListener("click", () => copyCurrentJson());
+            refs.downloadJsonButton.addEventListener("click", () => downloadCurrentJson());
+
+            refs.treeWrap.addEventListener("click", (event) => {
+                const button = event.target.closest("[data-node-action]");
+                if (!button) {
+                    return;
+                }
+
+                event.preventDefault();
+                event.stopPropagation();
+                const path = JSON.parse(button.dataset.path);
+                if (button.dataset.nodeAction === "copy-path") {
+                    copyText(formatPath(path), "Path copied.");
+                    return;
+                }
+
+                const value = getValueAtPath(state.value, path);
+                copyText(serializeValue(value), "Value copied.");
+            });
+
+            ["dragenter", "dragover"].forEach((eventName) => {
+                refs.inputPanel.addEventListener(eventName, (event) => {
+                    if (!hasDraggedFiles(event)) {
+                        return;
+                    }
+
+                    event.preventDefault();
+                    refs.inputPanel.classList.add("is-dragging");
+                });
+            });
+
+            ["dragleave", "drop"].forEach((eventName) => {
+                refs.inputPanel.addEventListener(eventName, (event) => {
+                    refs.inputPanel.classList.remove("is-dragging");
+                });
+            });
+
+            refs.inputPanel.addEventListener("drop", (event) => {
+                if (!hasDraggedFiles(event)) {
+                    return;
+                }
+
+                event.preventDefault();
+                const file = event.dataTransfer.files?.[0];
+                if (file) {
+                    readJsonFile(file);
+                }
+            });
+        }
+
+        function scheduleParse() {
+            window.clearTimeout(parseTimer);
+            parseTimer = window.setTimeout(parseNow, 120);
+        }
+
+        function parseNow() {
+            window.clearTimeout(parseTimer);
+            state.rawText = refs.input.value;
+            state.searchTerm = refs.searchInput.value.trim();
+
+            if (!state.rawText.trim()) {
+                resetParsedState();
+                renderEmpty();
+                updateControls();
+                return;
+            }
+
+            try {
+                state.value = JSON.parse(state.rawText);
+                state.valid = true;
+                state.formattedText = JSON.stringify(state.value, null, 2);
+                state.minifiedText = JSON.stringify(state.value);
+                state.stats = collectStats(state.value, state.rawText);
+                renderTree();
+            } catch (error) {
+                resetParsedState();
+                renderParseError(enhanceJsonError(error, state.rawText));
+            }
+
+            updateControls();
+        }
+
+        function resetParsedState() {
+            state.value = null;
+            state.valid = false;
+            state.formattedText = "";
+            state.minifiedText = "";
+            state.stats = null;
+            state.matchList = [];
+            state.matchPaths = new Set();
+            state.ancestorPaths = new Set();
+            state.currentMatchIndex = 0;
+        }
+
+        function renderEmpty() {
+            refs.statsBar.replaceChildren();
+            refs.treeWrap.replaceChildren(createMessage("Paste JSON or open a file to view it.", "empty"));
+            refs.outputStatus.textContent = "Waiting for JSON";
+            refs.outputStatus.className = "status";
+            refs.matchCount.textContent = "No search";
+        }
+
+        function renderParseError(details) {
+            refs.statsBar.replaceChildren();
+            refs.treeWrap.replaceChildren(createErrorCard(details));
+            refs.outputStatus.textContent = details.location || "Invalid JSON";
+            refs.outputStatus.className = "status error";
+            refs.matchCount.textContent = "No search";
+        }
+
+        function renderTree(options = {}) {
+            if (!state.valid) {
+                return;
+            }
+
+            prepareSearch();
+            state.renderedNodes = 0;
+            renderStats();
+
+            const tree = document.createElement("ul");
+            tree.className = "tree";
+            tree.appendChild(renderNode(null, state.value, [], 0));
+            refs.treeWrap.replaceChildren(tree);
+
+            const truncated = state.stats.nodes > renderLimit;
+            const typeLabel = titleCase(getType(state.value));
+            refs.outputStatus.textContent = truncated
+                ? `${typeLabel} rendered with ${formatNumber(renderLimit)} node limit`
+                : `${typeLabel} tree ready`;
+            refs.outputStatus.className = "status ok";
+
+            updateSearchControls();
+
+            if (options.scrollCurrent) {
+                window.setTimeout(() => {
+                    refs.treeWrap.querySelector(".tree-row.is-current")?.scrollIntoView({
+                        block: "nearest",
+                        inline: "nearest"
+                    });
+                }, 0);
+            }
+        }
+
+        function renderStats() {
+            const stats = state.stats;
+            const chips = [
+                `Top ${titleCase(stats.topType)}`,
+                `${formatNumber(stats.nodes)} nodes`,
+                `${formatNumber(stats.keys)} keys`,
+                `${formatNumber(stats.objects)} objects`,
+                `${formatNumber(stats.arrays)} arrays`,
+                `Depth ${formatNumber(stats.maxDepth)}`,
+                formatBytes(stats.bytes)
+            ];
+
+            refs.statsBar.replaceChildren(...chips.map((text) => {
+                const chip = document.createElement("span");
+                chip.className = "chip";
+                chip.textContent = text;
+                return chip;
+            }));
+        }
+
+        function renderNode(key, value, path, depth) {
+            if (state.renderedNodes >= renderLimit) {
+                return createLimitNode();
+            }
+
+            state.renderedNodes += 1;
+            const type = getType(value);
+            const isContainer = type === "object" || type === "array";
+            const pathKeyValue = pathKey(path);
+            const li = document.createElement("li");
+
+            if (isContainer) {
+                const details = document.createElement("details");
+                details.open = shouldOpenNode(path, depth);
+
+                const summary = createTreeRow("summary", key, value, path, type, true);
+                details.appendChild(summary);
+
+                const entries = type === "array"
+                    ? value.map((item, index) => [index, item])
+                    : Object.entries(value);
+
+                if (entries.length) {
+                    const children = document.createElement("ul");
+                    for (const [childKey, childValue] of entries) {
+                        if (state.renderedNodes >= renderLimit) {
+                            children.appendChild(createLimitNode());
+                            break;
+                        }
+
+                        children.appendChild(renderNode(childKey, childValue, path.concat(childKey), depth + 1));
+                    }
+                    details.appendChild(children);
+                }
+
+                li.appendChild(details);
+            } else {
+                li.appendChild(createTreeRow("div", key, value, path, type, false));
+            }
+
+            li.dataset.path = pathKeyValue;
+            return li;
+        }
+
+        function createTreeRow(tagName, key, value, path, type, isContainer) {
+            const row = document.createElement(tagName);
+            row.className = `tree-row type-${type}`;
+            const serializedPath = pathKey(path);
+            row.dataset.path = serializedPath;
+
+            if (state.matchPaths.has(serializedPath)) {
+                row.classList.add("is-match");
+            }
+
+            if (state.matchList[state.currentMatchIndex] === serializedPath) {
+                row.classList.add("is-current");
+            }
+
+            const marker = document.createElement("span");
+            marker.className = isContainer ? "twisty" : "leaf-spacer";
+            marker.setAttribute("aria-hidden", "true");
+            row.appendChild(marker);
+
+            const keyLabel = document.createElement("span");
+            keyLabel.className = "key";
+            keyLabel.textContent = formatKeyLabel(key);
+            row.appendChild(keyLabel);
+
+            const separator = document.createElement("span");
+            separator.className = "separator";
+            separator.textContent = ":";
+            row.appendChild(separator);
+
+            if (isContainer) {
+                const meta = document.createElement("span");
+                meta.className = "meta";
+                meta.textContent = getContainerPreview(value, type);
+                row.appendChild(meta);
+            } else {
+                const primitive = document.createElement("span");
+                primitive.className = "value";
+                primitive.textContent = formatPrimitive(value);
+                row.appendChild(primitive);
+            }
+
+            row.appendChild(createNodeActions(path));
+            return row;
+        }
+
+        function createNodeActions(path) {
+            const actions = document.createElement("span");
+            actions.className = "node-actions";
+
+            const formattedPath = formatPath(path);
+            const pathButton = document.createElement("button");
+            pathButton.className = "mini-button";
+            pathButton.type = "button";
+            pathButton.dataset.nodeAction = "copy-path";
+            pathButton.dataset.path = pathKey(path);
+            pathButton.textContent = "Path";
+            pathButton.title = `Copy path ${formattedPath}`;
+            pathButton.setAttribute("aria-label", `Copy path ${formattedPath}`);
+
+            const valueButton = document.createElement("button");
+            valueButton.className = "mini-button";
+            valueButton.type = "button";
+            valueButton.dataset.nodeAction = "copy-value";
+            valueButton.dataset.path = pathKey(path);
+            valueButton.textContent = "Value";
+            valueButton.title = `Copy value at ${formattedPath}`;
+            valueButton.setAttribute("aria-label", `Copy value at ${formattedPath}`);
+
+            actions.append(pathButton, valueButton);
+            return actions;
+        }
+
+        function createLimitNode() {
+            const li = document.createElement("li");
+            const row = document.createElement("div");
+            row.className = "tree-row";
+
+            const spacer = document.createElement("span");
+            spacer.className = "leaf-spacer";
+            spacer.setAttribute("aria-hidden", "true");
+
+            const message = document.createElement("span");
+            message.className = "meta";
+            message.textContent = `Rendering stopped at ${formatNumber(renderLimit)} nodes. Copy and download still use the full JSON.`;
+
+            row.append(spacer, message);
+            li.appendChild(row);
+            return li;
+        }
+
+        function createMessage(message, className) {
+            const element = document.createElement("div");
+            element.className = className;
+            element.textContent = message;
+            return element;
+        }
+
+        function createErrorCard(details) {
+            const card = document.createElement("div");
+            card.className = "error-card";
+
+            const title = document.createElement("h2");
+            title.textContent = "Invalid JSON";
+
+            const message = document.createElement("p");
+            message.textContent = details.message;
+
+            card.append(title, message);
+
+            if (details.location) {
+                const location = document.createElement("p");
+                location.textContent = details.location;
+                card.appendChild(location);
+            }
+
+            if (details.snippet) {
+                const snippet = document.createElement("p");
+                snippet.textContent = details.snippet;
+                card.appendChild(snippet);
+            }
+
+            return card;
+        }
+
+        function prepareSearch() {
+            state.searchTerm = refs.searchInput.value.trim();
+            state.matchList = [];
+            state.matchPaths = new Set();
+            state.ancestorPaths = new Set();
+
+            if (!state.searchTerm || !state.valid) {
+                state.currentMatchIndex = 0;
+                return;
+            }
+
+            const normalizedTerm = state.searchTerm.toLowerCase();
+            const stack = [{ key: null, value: state.value, path: [] }];
+
+            while (stack.length) {
+                const item = stack.pop();
+                const itemPathKey = pathKey(item.path);
+
+                if (nodeMatches(item.key, item.value, normalizedTerm)) {
+                    state.matchList.push(itemPathKey);
+                    state.matchPaths.add(itemPathKey);
+                    addAncestorPaths(item.path);
+                }
+
+                const type = getType(item.value);
+                if (type === "array") {
+                    for (let index = item.value.length - 1; index >= 0; index -= 1) {
+                        stack.push({
+                            key: index,
+                            value: item.value[index],
+                            path: item.path.concat(index)
+                        });
+                    }
+                } else if (type === "object") {
+                    const entries = Object.entries(item.value);
+                    for (let index = entries.length - 1; index >= 0; index -= 1) {
+                        const [childKey, childValue] = entries[index];
+                        stack.push({
+                            key: childKey,
+                            value: childValue,
+                            path: item.path.concat(childKey)
+                        });
+                    }
+                }
+            }
+
+            if (state.currentMatchIndex >= state.matchList.length) {
+                state.currentMatchIndex = Math.max(0, state.matchList.length - 1);
+            }
+        }
+
+        function nodeMatches(key, value, normalizedTerm) {
+            if (key !== null && String(key).toLowerCase().includes(normalizedTerm)) {
+                return true;
+            }
+
+            const type = getType(value);
+            if (type === "object" || type === "array") {
+                return false;
+            }
+
+            const valueText = type === "string" ? value : String(value);
+            return valueText.toLowerCase().includes(normalizedTerm);
+        }
+
+        function addAncestorPaths(path) {
+            for (let index = 0; index < path.length; index += 1) {
+                state.ancestorPaths.add(pathKey(path.slice(0, index)));
+            }
+        }
+
+        function shouldOpenNode(path, depth) {
+            const serializedPath = pathKey(path);
+            if (state.searchTerm) {
+                return state.ancestorPaths.has(serializedPath) || state.matchPaths.has(serializedPath);
+            }
+
+            if (state.expandMode === "all") {
+                return true;
+            }
+
+            if (state.expandMode === "collapse") {
+                return false;
+            }
+
+            return depth < Number(state.expandMode);
+        }
+
+        function updateControls() {
+            const hasJson = state.valid;
+            refs.formatInputButton.disabled = !hasJson;
+            refs.minifyInputButton.disabled = !hasJson;
+            refs.copyJsonButton.disabled = !hasJson;
+            refs.downloadJsonButton.disabled = !hasJson;
+            refs.searchInput.disabled = !hasJson;
+
+            if (!hasJson) {
+                refs.previousMatchButton.disabled = true;
+                refs.nextMatchButton.disabled = true;
+                refs.clearSearchButton.disabled = !refs.searchInput.value;
+            } else {
+                updateSearchControls();
+            }
+        }
+
+        function updateSearchControls() {
+            if (!state.searchTerm) {
+                refs.matchCount.textContent = "No search";
+                refs.previousMatchButton.disabled = true;
+                refs.nextMatchButton.disabled = true;
+                refs.clearSearchButton.disabled = true;
+                return;
+            }
+
+            refs.clearSearchButton.disabled = false;
+
+            if (!state.matchList.length) {
+                refs.matchCount.textContent = "0 matches";
+                refs.previousMatchButton.disabled = true;
+                refs.nextMatchButton.disabled = true;
+                return;
+            }
+
+            refs.matchCount.textContent = `${formatNumber(state.currentMatchIndex + 1)} / ${formatNumber(state.matchList.length)}`;
+            const singleMatch = state.matchList.length < 2;
+            refs.previousMatchButton.disabled = singleMatch;
+            refs.nextMatchButton.disabled = singleMatch;
+        }
+
+        function updateDepthControls() {
+            document.querySelectorAll("[data-depth]").forEach((button) => {
+                button.setAttribute("aria-pressed", String(button.dataset.depth === state.expandMode));
+            });
+        }
+
+        function updateOutputModeControls() {
+            document.querySelectorAll("[data-output-mode]").forEach((button) => {
+                button.setAttribute("aria-pressed", String(button.dataset.outputMode === state.outputMode));
+            });
+        }
+
+        function moveSearchMatch(direction) {
+            if (!state.matchList.length) {
+                return;
+            }
+
+            state.currentMatchIndex = (state.currentMatchIndex + direction + state.matchList.length) % state.matchList.length;
+            renderTree({ scrollCurrent: true });
+        }
+
+        function replaceInputWith(mode) {
+            if (!state.valid) {
+                showToast("Paste valid JSON first.", "error");
+                return;
+            }
+
+            refs.input.value = mode === "pretty" ? state.formattedText : state.minifiedText;
+            parseNow();
+            showToast(mode === "pretty" ? "Input formatted." : "Input minified.");
+        }
+
+        function copyCurrentJson() {
+            if (!state.valid) {
+                showToast("Paste valid JSON first.", "error");
+                return;
+            }
+
+            copyText(getOutputJson(), state.outputMode === "pretty" ? "Pretty JSON copied." : "Minified JSON copied.");
+        }
+
+        function downloadCurrentJson() {
+            if (!state.valid) {
+                showToast("Paste valid JSON first.", "error");
+                return;
+            }
+
+            try {
+                const blob = new Blob([getOutputJson()], { type: "application/json;charset=utf-8" });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement("a");
+                link.href = url;
+                link.download = getDownloadName();
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+                showToast("JSON downloaded.");
+            } catch (error) {
+                showToast("Could not download JSON.", "error");
+            }
+        }
+
+        function getOutputJson() {
+            return state.outputMode === "pretty" ? state.formattedText : state.minifiedText;
+        }
+
+        function getDownloadName() {
+            const baseName = state.currentFileName
+                ? state.currentFileName.replace(/\.json$/i, "")
+                : "json-viewer";
+            return `${baseName}.${state.outputMode}.json`;
+        }
+
+        async function copyText(text, successMessage) {
+            try {
+                if (navigator.clipboard?.writeText) {
+                    await navigator.clipboard.writeText(text);
+                } else {
+                    fallbackCopy(text);
+                }
+                showToast(successMessage);
+            } catch (error) {
+                try {
+                    fallbackCopy(text);
+                    showToast(successMessage);
+                } catch (fallbackError) {
+                    showToast("Could not copy to clipboard.", "error");
+                }
+            }
+        }
+
+        function fallbackCopy(text) {
+            const textarea = document.createElement("textarea");
+            textarea.value = text;
+            textarea.setAttribute("readonly", "");
+            textarea.style.position = "fixed";
+            textarea.style.left = "-9999px";
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand("copy");
+            textarea.remove();
+        }
+
+        function readJsonFile(file) {
+            const reader = new FileReader();
+
+            reader.addEventListener("load", () => {
+                state.currentFileName = file.name || "";
+                refs.input.value = String(reader.result || "");
+                parseNow();
+                showToast(`${file.name || "File"} loaded.`);
+            });
+
+            reader.addEventListener("error", () => {
+                showToast("Could not read file.", "error");
+            });
+
+            try {
+                reader.readAsText(file);
+            } catch (error) {
+                showToast("Could not read file.", "error");
+            }
+        }
+
+        function hasDraggedFiles(event) {
+            return Array.from(event.dataTransfer?.types || []).includes("Files");
+        }
+
+        function collectStats(value, rawText) {
+            const stats = {
+                topType: getType(value),
+                nodes: 0,
+                keys: 0,
+                objects: 0,
+                arrays: 0,
+                strings: 0,
+                numbers: 0,
+                booleans: 0,
+                nulls: 0,
+                maxDepth: 0,
+                bytes: new Blob([rawText]).size
+            };
+
+            const stack = [{ value, depth: 0 }];
+            while (stack.length) {
+                const item = stack.pop();
+                const type = getType(item.value);
+                stats.nodes += 1;
+                stats.maxDepth = Math.max(stats.maxDepth, item.depth);
+
+                if (type === "object") {
+                    stats.objects += 1;
+                    const entries = Object.entries(item.value);
+                    stats.keys += entries.length;
+                    for (const [, childValue] of entries) {
+                        stack.push({ value: childValue, depth: item.depth + 1 });
+                    }
+                } else if (type === "array") {
+                    stats.arrays += 1;
+                    for (const childValue of item.value) {
+                        stack.push({ value: childValue, depth: item.depth + 1 });
+                    }
+                } else if (type === "string") {
+                    stats.strings += 1;
+                } else if (type === "number") {
+                    stats.numbers += 1;
+                } else if (type === "boolean") {
+                    stats.booleans += 1;
+                } else if (type === "null") {
+                    stats.nulls += 1;
+                }
+            }
+
+            return stats;
+        }
+
+        function enhanceJsonError(error, text) {
+            const details = {
+                message: error?.message || "Could not parse JSON.",
+                location: "",
+                snippet: ""
+            };
+            const positionMatch = /position\s+(\d+)/i.exec(details.message);
+
+            if (!positionMatch) {
+                return details;
+            }
+
+            const position = Number(positionMatch[1]);
+            if (!Number.isFinite(position)) {
+                return details;
+            }
+
+            const before = text.slice(0, position);
+            const line = before.split("\n").length;
+            const column = before.length - before.lastIndexOf("\n");
+            const sourceLine = text.split("\n")[line - 1] || "";
+
+            details.location = `Line ${line}, column ${column}`;
+            details.snippet = sourceLine.trim() ? sourceLine.trim().slice(0, 220) : "";
+            return details;
+        }
+
+        function getType(value) {
+            if (value === null) {
+                return "null";
+            }
+
+            if (Array.isArray(value)) {
+                return "array";
+            }
+
+            return typeof value;
+        }
+
+        function getContainerPreview(value, type) {
+            const count = type === "array" ? value.length : Object.keys(value).length;
+            const label = type === "array"
+                ? count === 1 ? "item" : "items"
+                : count === 1 ? "key" : "keys";
+            return `${type} (${formatNumber(count)} ${label})`;
+        }
+
+        function formatPrimitive(value) {
+            const serialized = JSON.stringify(value);
+            if (serialized.length <= 180) {
+                return serialized;
+            }
+
+            return `${serialized.slice(0, 177)}...`;
+        }
+
+        function serializeValue(value) {
+            const type = getType(value);
+            if (type === "object" || type === "array") {
+                return JSON.stringify(value, null, 2);
+            }
+
+            return JSON.stringify(value);
+        }
+
+        function formatKeyLabel(key) {
+            if (key === null) {
+                return "root";
+            }
+
+            if (typeof key === "number") {
+                return `[${key}]`;
+            }
+
+            return isSafeKey(key) ? key : JSON.stringify(key);
+        }
+
+        function formatPath(path) {
+            if (!path.length) {
+                return "$";
+            }
+
+            return path.reduce((result, part) => {
+                if (typeof part === "number") {
+                    return `${result}[${part}]`;
+                }
+
+                if (isSafeKey(part)) {
+                    return result ? `${result}.${part}` : part;
+                }
+
+                return `${result}[${JSON.stringify(part)}]`;
+            }, "");
+        }
+
+        function isSafeKey(key) {
+            return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(String(key));
+        }
+
+        function getValueAtPath(value, path) {
+            return path.reduce((current, part) => current?.[part], value);
+        }
+
+        function pathKey(path) {
+            return JSON.stringify(path);
+        }
+
+        function titleCase(text) {
+            return `${text.charAt(0).toUpperCase()}${text.slice(1)}`;
+        }
+
+        function formatNumber(value) {
+            return new Intl.NumberFormat().format(value);
+        }
+
+        function formatBytes(bytes) {
+            if (bytes < 1024) {
+                return `${bytes} B`;
+            }
+
+            if (bytes < 1024 * 1024) {
+                return `${(bytes / 1024).toFixed(1)} KB`;
+            }
+
+            return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+        }
+
+        function setTheme(theme, persist) {
+            document.documentElement.dataset.theme = theme;
+
+            if (persist) {
+                try {
+                    localStorage.setItem(storageKey, theme);
+                } catch (error) {
+                    // Ignore storage failures; the active page still changes theme.
+                }
+            }
+
+            const dark = theme === "dark";
+            refs.themeButton.title = dark ? "Switch to light mode" : "Switch to dark mode";
+            refs.themeButton.setAttribute("aria-label", refs.themeButton.title);
+            refs.themeButton.setAttribute("aria-pressed", String(dark));
+            refs.themeButton.innerHTML = `<i data-lucide="${dark ? "sun" : "moon"}" aria-hidden="true"></i>`;
+            refreshIcons();
+        }
+
+        function refreshIcons() {
+            if (window.lucide?.createIcons) {
+                window.lucide.createIcons();
+            }
+        }
+
+        function showToast(message, type = "info") {
+            window.clearTimeout(toastTimer);
+            refs.toast.textContent = message;
+            refs.toast.className = `toast ${type === "error" ? "error" : ""}`.trim();
+            window.requestAnimationFrame(() => {
+                refs.toast.classList.add("is-visible");
+            });
+            toastTimer = window.setTimeout(() => {
+                refs.toast.classList.remove("is-visible");
+            }, 2200);
+        }
+    </script>
+</body>
+</html>

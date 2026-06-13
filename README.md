@@ -10,6 +10,7 @@ Some built with LLM assistance.
 - [Markdown Preview](markdown-preview/) - write markdown and preview rendered HTML locally.
 - [Text Diff](text-diff/) - compare two text versions side by side.
 - [Table Format Converter](table-format-converter/) - convert Markdown tables, CSV, and TSV for clipboard, Sheets, and docs.
+- [JSON Viewer](json-viewer/) - view, search, and copy JSON as a tree.
 - [CSV Merge](csv-merge/) - merge multiple CSV files.
 - [Local PDF](local-pdf/) - edit, merge, split, sign, crop, watermark, etc PDF files in your browser.
 - [Notepad](notepad/) - using local storage, no tracking.
