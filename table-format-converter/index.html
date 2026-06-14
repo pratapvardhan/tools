@@ -274,6 +274,14 @@
             accent-color: var(--accent);
         }
 
+        .check.disabled {
+            color: var(--muted);
+        }
+
+        .check input:disabled {
+            cursor: not-allowed;
+        }
+
         .workspace {
             min-height: 0;
             display: grid;
@@ -488,7 +496,7 @@
         <header class="topbar">
             <div class="title-block">
                 <h1>Table Format Converter</h1>
-                <p class="subtitle">Convert Markdown tables, CSV, and TSV for clipboard, Sheets, and docs.</p>
+                <p class="subtitle">Convert Markdown tables, CSV, TSV, and JSON for clipboard, Sheets, and docs.</p>
             </div>
             <div class="actions" aria-label="Table actions">
                 <button class="button icon-button" type="button" id="themeButton" title="Switch to dark mode" aria-label="Switch to dark mode" aria-pressed="false">
@@ -514,6 +522,7 @@
                         <button class="segment" type="button" data-input-format="markdown" aria-pressed="false">Markdown</button>
                         <button class="segment" type="button" data-input-format="csv" aria-pressed="false">CSV</button>
                         <button class="segment" type="button" data-input-format="tsv" aria-pressed="false">TSV</button>
+                        <button class="segment" type="button" data-input-format="json" aria-pressed="false">JSON</button>
                     </div>
                 </div>
                 <div class="control-group">
@@ -547,7 +556,7 @@
                     <h2 class="panel-title">Input</h2>
                     <div class="status" id="inputStatus" aria-live="polite"></div>
                 </div>
-                <textarea id="inputText" spellcheck="false" aria-label="Input table text" placeholder="Paste a Markdown table, CSV, or TSV here"></textarea>
+                <textarea id="inputText" spellcheck="false" aria-label="Input table text" placeholder="Paste a Markdown table, CSV, TSV, or JSON here"></textarea>
             </section>
 
             <section class="panel">
@@ -595,7 +604,8 @@
             firstRowHeader: true,
             padMarkdown: true,
             grid: [],
-            detectedFormat: "auto"
+            detectedFormat: "auto",
+            forceFirstRowHeader: false
         };
 
         const inputText = document.getElementById("inputText");
@@ -700,7 +710,16 @@
             return count;
         }
 
+        function looksLikeJson(text) {
+            const trimmed = text.trim();
+            return trimmed.startsWith("{") || trimmed.startsWith("[");
+        }
+
         function detectInputFormat(text) {
+            if (looksLikeJson(text)) {
+                return "json";
+            }
+
             if (findMarkdownTable(normalizeLineEndings(text))) {
                 return "markdown";
             }
@@ -853,13 +872,117 @@
                 .filter((row) => row.length > 1);
         }
 
-        function normalizeGrid(rows) {
+        function isPlainObject(value) {
+            return Object.prototype.toString.call(value) === "[object Object]";
+        }
+
+        function formatJsonCell(value) {
+            if (value == null) {
+                return "";
+            }
+
+            if (typeof value === "string") {
+                return value;
+            }
+
+            if (typeof value === "number" || typeof value === "boolean") {
+                return String(value);
+            }
+
+            const serialized = JSON.stringify(value);
+            return serialized === undefined ? "" : serialized;
+        }
+
+        function flattenJsonObject(value, prefix = "", row = {}) {
+            const entries = Object.entries(value);
+
+            if (!entries.length && prefix) {
+                row[prefix] = "{}";
+                return row;
+            }
+
+            entries.forEach(([key, nestedValue]) => {
+                const path = prefix ? `${prefix}.${key}` : key;
+
+                if (isPlainObject(nestedValue)) {
+                    flattenJsonObject(nestedValue, path, row);
+                } else {
+                    row[path] = formatJsonCell(nestedValue);
+                }
+            });
+
+            return row;
+        }
+
+        function jsonObjectsToRows(records) {
+            const columns = [];
+            const seenColumns = new Set();
+            const flattenedRows = records.map((record) => {
+                const row = isPlainObject(record)
+                    ? flattenJsonObject(record)
+                    : { value: formatJsonCell(record) };
+
+                Object.keys(row).forEach((column) => {
+                    if (!seenColumns.has(column)) {
+                        seenColumns.add(column);
+                        columns.push(column);
+                    }
+                });
+
+                return row;
+            });
+
+            if (!columns.length && records.length) {
+                return [["value"], ...records.map((record) => [formatJsonCell(record)])];
+            }
+
+            return [
+                columns,
+                ...flattenedRows.map((row) => columns.map((column) => row[column] ?? ""))
+            ];
+        }
+
+        function parseJsonTable(text) {
+            const value = JSON.parse(text.trim());
+
+            if (Array.isArray(value)) {
+                if (!value.length) {
+                    return { rows: [], forceFirstRowHeader: false };
+                }
+
+                if (value.every(Array.isArray)) {
+                    return {
+                        rows: value.map((row) => row.map(formatJsonCell)),
+                        forceFirstRowHeader: false
+                    };
+                }
+
+                return {
+                    rows: jsonObjectsToRows(value),
+                    forceFirstRowHeader: true
+                };
+            }
+
+            if (isPlainObject(value)) {
+                return {
+                    rows: jsonObjectsToRows([value]),
+                    forceFirstRowHeader: true
+                };
+            }
+
+            return {
+                rows: [["value"], [formatJsonCell(value)]],
+                forceFirstRowHeader: true
+            };
+        }
+
+        function normalizeGrid(rows, options = {}) {
             const cleaned = rows
                 .map((row) => row.map((cell) => {
                     const value = String(cell ?? "");
                     return state.trimCells ? value.trim() : value;
                 }))
-                .filter((row) => row.some((cell) => cell !== ""));
+                .filter((row) => options.preserveEmptyRows || row.some((cell) => cell !== ""));
 
             const columnCount = cleaned.reduce((max, row) => Math.max(max, row.length), 0);
 
@@ -878,11 +1001,30 @@
             }
 
             const format = state.inputFormat === "auto" ? detectInputFormat(text) : state.inputFormat;
+            if (format === "json") {
+                try {
+                    const parsedJson = parseJsonTable(text);
+
+                    return {
+                        format,
+                        grid: normalizeGrid(parsedJson.rows, { preserveEmptyRows: true }),
+                        forceFirstRowHeader: parsedJson.forceFirstRowHeader
+                    };
+                } catch (error) {
+                    return {
+                        format,
+                        grid: [],
+                        forceFirstRowHeader: false,
+                        error: "Invalid JSON"
+                    };
+                }
+            }
+
             const rows = format === "markdown"
                 ? parseMarkdown(text)
                 : parseDelimited(text, format === "tsv" ? "\t" : ",");
 
-            return { format, grid: normalizeGrid(rows) };
+            return { format, grid: normalizeGrid(rows), forceFirstRowHeader: false };
         }
 
         function escapeDelimitedCell(value, delimiter) {
@@ -908,16 +1050,21 @@
                 .replace(/\|/g, "\\|");
         }
 
+        function usesFirstRowHeader() {
+            return state.forceFirstRowHeader || state.firstRowHeader;
+        }
+
         function serializeMarkdown(grid) {
             if (!grid.length) {
                 return "";
             }
 
             const columnCount = grid[0].length;
-            const header = state.firstRowHeader
+            const hasHeader = usesFirstRowHeader();
+            const header = hasHeader
                 ? grid[0]
                 : Array.from({ length: columnCount }, (_, index) => `Column ${index + 1}`);
-            const body = state.firstRowHeader ? grid.slice(1) : grid;
+            const body = hasHeader ? grid.slice(1) : grid;
             const rows = [header, ...body].map((row) => row.map(escapeMarkdownCell));
             const widths = Array.from({ length: columnCount }, (_, columnIndex) => {
                 if (!state.padMarkdown) {
@@ -957,26 +1104,49 @@
             });
         }
 
+        function syncFirstRowHeaderControl() {
+            const label = firstRowHeader.closest(".check");
+
+            firstRowHeader.disabled = state.forceFirstRowHeader;
+
+            if (label) {
+                label.classList.toggle("disabled", state.forceFirstRowHeader);
+                label.title = state.forceFirstRowHeader ? "JSON object keys are used as headers." : "";
+            }
+        }
+
         function update() {
             const parsed = parseInput(inputText.value);
             state.grid = parsed.grid;
             state.detectedFormat = parsed.format;
+            state.forceFirstRowHeader = Boolean(parsed.forceFirstRowHeader);
+            syncFirstRowHeaderControl();
+
+            if (parsed.error) {
+                outputText.value = "";
+                inputStatus.textContent = `${parsed.format.toUpperCase()} - ${parsed.error}`;
+                previewStatus.textContent = parsed.error;
+                renderPreview([], parsed.error);
+                return;
+            }
+
             outputText.value = serializeOutput(state.grid, state.outputFormat);
 
             const rows = state.grid.length;
             const columns = rows ? state.grid[0].length : 0;
-            inputStatus.textContent = rows ? `${parsed.format.toUpperCase()} - ${rows} rows x ${columns} columns` : "";
-            previewStatus.textContent = rows ? `${rows} rows x ${columns} columns` : "";
+            const displayRows = state.forceFirstRowHeader ? Math.max(rows - 1, 0) : rows;
+            inputStatus.textContent = rows ? `${parsed.format.toUpperCase()} - ${displayRows} rows x ${columns} columns` : "";
+            previewStatus.textContent = rows ? `${displayRows} rows x ${columns} columns` : "";
             renderPreview(state.grid);
         }
 
-        function renderPreview(grid) {
+        function renderPreview(grid, emptyMessage = "Paste table data to preview it here.") {
             preview.textContent = "";
 
             if (!grid.length) {
                 const empty = document.createElement("div");
                 empty.className = "empty";
-                empty.textContent = "Paste table data to preview it here.";
+                empty.textContent = emptyMessage;
                 preview.append(empty);
                 return;
             }
@@ -991,9 +1161,10 @@
             headerRow.append(corner);
 
             const columnCount = grid[0].length;
+            const hasHeader = usesFirstRowHeader();
             for (let columnIndex = 0; columnIndex < columnCount; columnIndex += 1) {
                 const th = document.createElement("th");
-                th.textContent = state.firstRowHeader && grid[0][columnIndex]
+                th.textContent = hasHeader && grid[0][columnIndex]
                     ? grid[0][columnIndex]
                     : `Column ${columnIndex + 1}`;
                 headerRow.append(th);
@@ -1002,7 +1173,7 @@
             thead.append(headerRow);
             table.append(thead);
 
-            const bodyRows = state.firstRowHeader ? grid.slice(1) : grid;
+            const bodyRows = hasHeader ? grid.slice(1) : grid;
             bodyRows.slice(0, 100).forEach((row, rowIndex) => {
                 const tr = document.createElement("tr");
                 const rowNumber = document.createElement("td");
