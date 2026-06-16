@@ -496,7 +496,7 @@
         <header class="topbar">
             <div class="title-block">
                 <h1>Table Format Converter</h1>
-                <p class="subtitle">Convert Markdown tables, CSV, TSV, and JSON for clipboard, Sheets, and docs.</p>
+                <p class="subtitle">Convert Markdown tables, CSV, TSV, JSON, and boxed CLI tables for clipboard, Sheets, and docs.</p>
             </div>
             <div class="actions" aria-label="Table actions">
                 <button class="button icon-button" type="button" id="themeButton" title="Switch to dark mode" aria-label="Switch to dark mode" aria-pressed="false">
@@ -520,6 +520,7 @@
                     <div class="segmented" role="group" aria-label="Input format">
                         <button class="segment" type="button" data-input-format="auto" aria-pressed="true">Auto</button>
                         <button class="segment" type="button" data-input-format="markdown" aria-pressed="false">Markdown</button>
+                        <button class="segment" type="button" data-input-format="box" aria-pressed="false">Box</button>
                         <button class="segment" type="button" data-input-format="csv" aria-pressed="false">CSV</button>
                         <button class="segment" type="button" data-input-format="tsv" aria-pressed="false">TSV</button>
                         <button class="segment" type="button" data-input-format="json" aria-pressed="false">JSON</button>
@@ -556,7 +557,7 @@
                     <h2 class="panel-title">Input</h2>
                     <div class="status" id="inputStatus" aria-live="polite"></div>
                 </div>
-                <textarea id="inputText" spellcheck="false" aria-label="Input table text" placeholder="Paste a Markdown table, CSV, TSV, or JSON here"></textarea>
+                <textarea id="inputText" spellcheck="false" aria-label="Input table text" placeholder="Paste a Markdown table, boxed CLI table, CSV, TSV, or JSON here"></textarea>
             </section>
 
             <section class="panel">
@@ -684,8 +685,135 @@
             }
         }
 
+        const boxVerticalChars = new Set(Array.from("│┃║┆┇┊┋╎╏|"));
+        const boxHorizontalChars = new Set(Array.from("─━═╌╍┄┅┈┉-="));
+        const boxConnectorChars = new Set(Array.from("┌┬┐├┼┤└┴┘┏┳┓┣╋┫┗┻┛╔╦╗╠╬╣╚╩╝╒╤╕╞╪╡╘╧╛╓╥╖╟╫╢╙╨╜╭╮╰╯+"));
+
         function normalizeLineEndings(text) {
             return text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+        }
+
+        function isBoxVerticalChar(char) {
+            return boxVerticalChars.has(char);
+        }
+
+        function isBoxHorizontalChar(char) {
+            return boxHorizontalChars.has(char);
+        }
+
+        function isBoxConnectorChar(char) {
+            return boxConnectorChars.has(char);
+        }
+
+        function isBoxBorderLine(line) {
+            const trimmed = line.trim();
+
+            if (!trimmed) {
+                return false;
+            }
+
+            const chars = Array.from(trimmed);
+            const hasHorizontal = chars.some(isBoxHorizontalChar);
+            const hasTableEdge = chars.some((char) => isBoxConnectorChar(char) || isBoxVerticalChar(char));
+
+            return hasHorizontal && hasTableEdge && chars.every((char) => {
+                return char === " "
+                    || isBoxHorizontalChar(char)
+                    || isBoxConnectorChar(char)
+                    || isBoxVerticalChar(char);
+            });
+        }
+
+        function isBoxDataLine(line) {
+            const trimmed = line.trim();
+
+            if (!trimmed || isBoxBorderLine(trimmed)) {
+                return false;
+            }
+
+            return Array.from(trimmed).filter(isBoxVerticalChar).length >= 2;
+        }
+
+        function isBoxTableLine(line) {
+            return isBoxBorderLine(line) || isBoxDataLine(line);
+        }
+
+        function splitBoxDataLine(line) {
+            const trimmed = line.trim();
+            const chars = Array.from(trimmed);
+            const cells = [];
+            let cell = "";
+
+            chars.forEach((char) => {
+                if (isBoxVerticalChar(char)) {
+                    cells.push(cell);
+                    cell = "";
+                } else {
+                    cell += char;
+                }
+            });
+
+            cells.push(cell);
+
+            if (chars.length && isBoxVerticalChar(chars[0])) {
+                cells.shift();
+            }
+
+            if (chars.length && isBoxVerticalChar(chars[chars.length - 1])) {
+                cells.pop();
+            }
+
+            return cells;
+        }
+
+        function isValidBoxTable(lines) {
+            const dataRows = lines
+                .filter(isBoxDataLine)
+                .map(splitBoxDataLine);
+            const borderCount = lines.filter(isBoxBorderLine).length;
+
+            return borderCount > 0 && dataRows.some((row) => row.length > 1);
+        }
+
+        function findBoxTable(text) {
+            const lines = normalizeLineEndings(text).split("\n");
+            let start = -1;
+
+            for (let index = 0; index <= lines.length; index += 1) {
+                const line = lines[index] ?? "";
+
+                if (index < lines.length && isBoxTableLine(line)) {
+                    if (start === -1) {
+                        start = index;
+                    }
+                    continue;
+                }
+
+                if (start !== -1) {
+                    const tableLines = lines.slice(start, index);
+
+                    if (isValidBoxTable(tableLines)) {
+                        return { lines: tableLines, start: 0 };
+                    }
+
+                    start = -1;
+                }
+            }
+
+            return null;
+        }
+
+        function parseBox(text) {
+            const table = findBoxTable(text);
+
+            if (!table) {
+                return [];
+            }
+
+            return table.lines
+                .filter(isBoxDataLine)
+                .map(splitBoxDataLine)
+                .filter((row) => row.length > 1);
         }
 
         function countOutsideQuotes(text, char) {
@@ -722,6 +850,10 @@
 
             if (findMarkdownTable(normalizeLineEndings(text))) {
                 return "markdown";
+            }
+
+            if (findBoxTable(text)) {
+                return "box";
             }
 
             const tabCount = countOutsideQuotes(text, "\t");
@@ -1022,7 +1154,9 @@
 
             const rows = format === "markdown"
                 ? parseMarkdown(text)
-                : parseDelimited(text, format === "tsv" ? "\t" : ",");
+                : format === "box"
+                    ? parseBox(text)
+                    : parseDelimited(text, format === "tsv" ? "\t" : ",");
 
             return { format, grid: normalizeGrid(rows), forceFirstRowHeader: false };
         }
