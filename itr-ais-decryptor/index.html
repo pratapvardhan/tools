@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="shortcut icon" href="https://pratapvardhan.com/assets/favicon.ico">
+    <title>AIS JSON Decryptor</title>
+    <style>
+        :root {
+            color-scheme: light;
+            --bg: #f7f7f6;
+            --surface: #ffffff;
+            --surface-muted: #f4f5f4;
+            --border: #dededb;
+            --border-strong: #b9bbb6;
+            --text: #20211f;
+            --muted: #686b66;
+            --accent: #14532d;
+            --accent-hover: #0f3f24;
+            --on-accent: #ffffff;
+            --danger: #a33b34;
+            --success: #197342;
+            --shadow: 0 12px 30px rgba(32, 33, 31, 0.08);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            min-height: 100%;
+        }
+
+        body {
+            margin: 0;
+            min-width: 320px;
+            background: var(--bg);
+            color: var(--text);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            line-height: 1.4;
+        }
+
+        button,
+        input,
+        textarea {
+            font: inherit;
+        }
+
+        button {
+            border: 0;
+        }
+
+        .app {
+            max-width: 760px;
+            margin: 0 auto;
+            padding: 1rem;
+        }
+
+        .shell {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        .topbar {
+            display: flex;
+            align-items: end;
+            justify-content: space-between;
+            gap: 1rem;
+            padding: 0.9rem 1rem;
+            border-bottom: 1px solid var(--border);
+            background: var(--surface);
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 1.05rem;
+            font-weight: 650;
+            letter-spacing: 0;
+        }
+
+        .subtitle {
+            margin: 0;
+            color: var(--muted);
+            font-size: 0.82rem;
+            text-align: right;
+        }
+
+        a {
+            color: inherit;
+            text-underline-offset: 0.2rem;
+        }
+
+        .content {
+            padding: 1rem;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.75rem;
+        }
+
+        .stack {
+            display: grid;
+            gap: 0.75rem;
+        }
+
+        .field {
+            display: flex;
+            flex-direction: column;
+            gap: 0.3rem;
+        }
+
+        label {
+            color: var(--muted);
+            font-size: 0.78rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        input[type="text"],
+        input[type="password"],
+        input[type="file"] {
+            width: 100%;
+            min-height: 2.25rem;
+            padding: 0.45rem 0.6rem;
+            border: 1px solid var(--border);
+            border-radius: 7px;
+            background: #fff;
+            color: var(--text);
+            font-size: 0.92rem;
+        }
+
+        input:focus-visible,
+        button:focus-visible,
+        summary:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+
+        .help {
+            color: var(--muted);
+            font-size: 0.8rem;
+        }
+
+        details {
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--surface-muted);
+            padding: 0.6rem 0.7rem;
+        }
+
+        summary {
+            cursor: pointer;
+            color: var(--muted);
+            font-size: 0.86rem;
+            font-weight: 700;
+        }
+
+        .details-grid {
+            display: grid;
+            gap: 0.7rem;
+            margin-top: 0.7rem;
+        }
+
+        .actions {
+            display: flex;
+            align-items: center;
+            gap: 0.45rem;
+            flex-wrap: wrap;
+            margin-top: 0.85rem;
+        }
+
+        .button {
+            min-height: 2.15rem;
+            padding: 0.38rem 0.7rem;
+            border-radius: 7px;
+            border: 1px solid var(--border-strong);
+            background: var(--surface);
+            color: var(--text);
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        .button:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        .button.primary {
+            border-color: var(--accent);
+            background: var(--accent);
+            color: var(--on-accent);
+        }
+
+        .button.primary:hover {
+            background: var(--accent-hover);
+            border-color: var(--accent-hover);
+            color: var(--on-accent);
+        }
+
+        .button.secondary {
+            background: var(--surface-muted);
+        }
+
+        .button:disabled {
+            opacity: 0.55;
+            cursor: not-allowed;
+        }
+
+        .status {
+            margin-top: 0.85rem;
+            padding: 0.55rem 0.7rem;
+            border-radius: 8px;
+            background: var(--surface-muted);
+            color: var(--muted);
+            font-size: 0.88rem;
+            white-space: pre-wrap;
+        }
+
+        .status.error {
+            background: #fee2e2;
+            color: var(--danger);
+        }
+
+        .status.success {
+            background: #dcfce7;
+            color: var(--success);
+        }
+
+        pre {
+            margin: 0.85rem 0 0;
+            padding: 0.8rem;
+            border: 1px solid #272d35;
+            border-radius: 8px;
+            background: #111418;
+            color: #eceff3;
+            overflow: auto;
+            max-height: 58vh;
+            font-size: 12px;
+            line-height: 1.45;
+        }
+
+        @media (max-width: 700px) {
+            .app {
+                padding: 0.75rem;
+            }
+
+            .topbar {
+                align-items: start;
+                flex-direction: column;
+                gap: 0.35rem;
+            }
+
+            .subtitle {
+                text-align: left;
+            }
+
+            .grid {
+                grid-template-columns: 1fr;
+            }
+
+            .button {
+                flex: 1 1 auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main class="app">
+        <section class="shell">
+            <header class="topbar">
+                <h1>AIS JSON Decryptor</h1>
+                <p class="subtitle">Decrypt <a href="https://www.incometaxindia.gov.in/annual-information-statement" target="_blank">AIS JSON</a> locally in the browser. Nothing is uploaded.</p>
+            </header>
+
+            <div class="content">
+                <div class="stack">
+                    <div class="field">
+                        <label for="fileInput">Encrypted AIS JSON file</label>
+                        <input id="fileInput" type="file" accept=".json,application/json,text/plain" />
+                    </div>
+
+                    <div class="grid">
+                        <div class="field">
+                            <label for="panInput">PAN</label>
+                            <input id="panInput" type="text" placeholder="ABCDE1234F" autocomplete="off" />
+                        </div>
+
+                        <div class="field">
+                            <label for="dobInput">DOB in DDMMYYYY</label>
+                            <input id="dobInput" type="text" placeholder="01011990" inputmode="numeric" autocomplete="off" />
+                        </div>
+                    </div>
+
+                    <details>
+                        <summary>Advanced options</summary>
+                        <div class="details-grid">
+                            <div class="field">
+                                <label for="middleInput">Password middle segment</label>
+                                <input id="middleInput" type="text" value="GQ39%*g" autocomplete="off" />
+                                <div class="help">Default password: lowercased PAN + middle segment + DOB.</div>
+                            </div>
+
+                            <div class="field">
+                                <label for="manualPassword">Optional full password override</label>
+                                <input id="manualPassword" type="password" placeholder="Leave blank to construct from PAN + DOB" autocomplete="off" />
+                                <div class="help">Use this only if your AIS file uses a different password formula.</div>
+                            </div>
+                        </div>
+                    </details>
+
+                    <div class="actions">
+                        <button id="decryptBtn" class="button primary">Decrypt and render JSON</button>
+                        <button id="copyBtn" class="button secondary" disabled>Copy JSON</button>
+                        <button id="saveBtn" class="button secondary" disabled>Save decrypted JSON</button>
+                    </div>
+                </div>
+
+                <div id="status" class="status">Waiting for input.</div>
+                <pre id="output" hidden></pre>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        "use strict";
+
+        const fileInput = document.getElementById("fileInput");
+        const panInput = document.getElementById("panInput");
+        const dobInput = document.getElementById("dobInput");
+        const middleInput = document.getElementById("middleInput");
+        const manualPassword = document.getElementById("manualPassword");
+        const decryptBtn = document.getElementById("decryptBtn");
+        const copyBtn = document.getElementById("copyBtn");
+        const saveBtn = document.getElementById("saveBtn");
+        const statusBox = document.getElementById("status");
+        const output = document.getElementById("output");
+
+        let decryptedPrettyJson = "";
+        let decryptedObject = null;
+        let originalFileName = "ais";
+
+        function setStatus(message, type = "") {
+            statusBox.className = "status" + (type ? " " + type : "");
+            statusBox.textContent = message;
+        }
+
+        function hexToBytes(hex) {
+            if (!/^[0-9a-fA-F]+$/.test(hex) || hex.length % 2 !== 0) {
+                throw new Error("Invalid hex data.");
+            }
+
+            const out = new Uint8Array(hex.length / 2);
+            for (let i = 0; i < out.length; i++) {
+                out[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
+            }
+            return out;
+        }
+
+        function base64ToBytes(base64) {
+            const normalized = base64.replace(/\s+/g, "");
+            const binary = atob(normalized);
+            const out = new Uint8Array(binary.length);
+
+            for (let i = 0; i < binary.length; i++) {
+                out[i] = binary.charCodeAt(i);
+            }
+            return out;
+        }
+
+        function ciphertextToBytes(rawCiphertext) {
+            const compact = rawCiphertext.replace(/\s+/g, "");
+
+            if (/^[0-9a-fA-F]+$/.test(compact) && compact.length % 2 === 0) {
+                return hexToBytes(compact);
+            }
+
+            return base64ToBytes(compact);
+        }
+
+        function validateInputs() {
+            const file = fileInput.files && fileInput.files[0];
+            if (!file) throw new Error("Please select an encrypted AIS JSON file.");
+
+            const fullPassword = manualPassword.value.trim();
+            if (fullPassword) return { file, password: fullPassword };
+
+            const pan = panInput.value.trim().toLowerCase();
+            const dob = dobInput.value.trim();
+            const middle = middleInput.value;
+
+            if (!/^[a-z]{5}[0-9]{4}[a-z]$/i.test(pan)) {
+                throw new Error("Please enter a valid 10-character PAN.");
+            }
+
+            if (!/^[0-9]{8}$/.test(dob)) {
+                throw new Error("Please enter DOB in DDMMYYYY format.");
+            }
+
+            const password = pan + middle + dob;
+            return { file, password };
+        }
+
+        async function deriveAesKey(password, saltBytes) {
+            const encoder = new TextEncoder();
+
+            const keyMaterial = await crypto.subtle.importKey(
+                "raw",
+                encoder.encode(password),
+                { name: "PBKDF2" },
+                false,
+                ["deriveKey"]
+            );
+
+            return crypto.subtle.deriveKey(
+                {
+                    name: "PBKDF2",
+                    salt: saltBytes,
+                    iterations: 1000,
+                    hash: "SHA-256"
+                },
+                keyMaterial,
+                {
+                    name: "AES-CBC",
+                    length: 256
+                },
+                false,
+                ["decrypt"]
+            );
+        }
+
+        async function decryptAisText(encryptedText, password) {
+            const compact = encryptedText.trim();
+
+            if (compact.length < 65) {
+                throw new Error("File content is too short to be a valid AIS encrypted JSON.");
+            }
+
+            const ivHex = compact.slice(0, 32);
+            const saltHex = compact.slice(32, 64);
+            const cipherTextRaw = compact.slice(64);
+
+            const ivBytes = hexToBytes(ivHex);
+            const saltBytes = hexToBytes(saltHex);
+            const cipherBytes = ciphertextToBytes(cipherTextRaw);
+
+            const key = await deriveAesKey(password, saltBytes);
+
+            const decryptedBuffer = await crypto.subtle.decrypt(
+                {
+                    name: "AES-CBC",
+                    iv: ivBytes
+                },
+                key,
+                cipherBytes
+            );
+
+            return new TextDecoder("utf-8").decode(decryptedBuffer);
+        }
+
+        function makeDownloadName(name) {
+            return name
+                .replace(/\.[^.]+$/, "")
+                .replace(/[^a-zA-Z0-9._-]+/g, "_") + "_decrypted.json";
+        }
+
+        async function copyText(text) {
+            if (navigator.clipboard && window.isSecureContext) {
+                await navigator.clipboard.writeText(text);
+                return;
+            }
+
+            const textarea = document.createElement("textarea");
+            textarea.value = text;
+            textarea.setAttribute("readonly", "");
+            textarea.style.position = "fixed";
+            textarea.style.opacity = "0";
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand("copy");
+            textarea.remove();
+        }
+
+        decryptBtn.addEventListener("click", async () => {
+            copyBtn.disabled = true;
+            saveBtn.disabled = true;
+            output.hidden = true;
+            output.textContent = "";
+            decryptedPrettyJson = "";
+            decryptedObject = null;
+
+            try {
+                if (!window.crypto || !crypto.subtle) {
+                    throw new Error("This browser does not support Web Crypto. Use a modern Chromium, Firefox, Safari, or Edge browser.");
+                }
+
+                const { file, password } = validateInputs();
+                originalFileName = file.name || "ais";
+
+                setStatus("Reading file...");
+                const encryptedText = await file.text();
+
+                setStatus("Decrypting...");
+                const plainText = await decryptAisText(encryptedText, password);
+
+                try {
+                    decryptedObject = JSON.parse(plainText);
+                    decryptedPrettyJson = JSON.stringify(decryptedObject, null, 2);
+                } catch {
+                    throw new Error("Decryption produced text, but it was not valid JSON. Check PAN, DOB, and password formula.");
+                }
+
+                output.textContent = decryptedPrettyJson;
+                output.hidden = false;
+                copyBtn.disabled = false;
+                saveBtn.disabled = false;
+
+                setStatus(
+                    "Decryption successful.\nRendered JSON is shown below and can be copied or saved.",
+                    "success"
+                );
+            } catch (err) {
+                setStatus("Error: " + (err && err.message ? err.message : String(err)), "error");
+            }
+        });
+
+        copyBtn.addEventListener("click", async () => {
+            if (!decryptedPrettyJson) return;
+
+            try {
+                await copyText(decryptedPrettyJson);
+                setStatus("Copied rendered JSON to clipboard.", "success");
+            } catch (err) {
+                setStatus("Error: Could not copy JSON to clipboard.", "error");
+            }
+        });
+
+        saveBtn.addEventListener("click", () => {
+            if (!decryptedPrettyJson) return;
+
+            const blob = new Blob([decryptedPrettyJson], {
+                type: "application/json;charset=utf-8"
+            });
+
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(blob);
+            a.download = makeDownloadName(originalFileName);
+            document.body.appendChild(a);
+            a.click();
+
+            URL.revokeObjectURL(a.href);
+            a.remove();
+        });
+    </script>
+</body>
+</html>
