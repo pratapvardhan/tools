@@ -20,6 +20,7 @@ Some built with LLM assistance.
 - [Location Mapper](location-mapper/) - geocode locations and plot on map.
 - [Image Color Quantizer](image-color-quantizer/) - reduce number of colors in an image by combining them to nearest ones.
 - [Image to Base64](image-to-base64/) - convert image to base64 string.
+- [Photo Collage](photo-collage/) - arrange and export mixed-size photos locally in your browser.
 - [Notes in Browser tab](https://pratapvardhan.com/notes/browser/note-taking/) - write notes in your browser.
 - [AIS JSON Decryptor](itr-ais-decryptor/) - decrypt AIS JSON files locally in your browser.
 
