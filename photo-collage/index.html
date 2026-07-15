@@ -212,6 +212,7 @@
       <label class="field"><span>W</span><input id="canvasW" type="number" min="64" max="8000" value="1080" inputmode="numeric"></label>
       <label class="field"><span>H</span><input id="canvasH" type="number" min="64" max="8000" value="1080" inputmode="numeric"></label>
       <label class="field optional"><span>Gap</span><input id="gap" type="number" min="0" max="200" value="8" inputmode="numeric"></label>
+      <label class="field optional" title="Space between the photos and the canvas edge"><span>Outer</span><input id="padding" type="number" min="0" max="1000" value="16" inputmode="numeric" aria-label="Outer padding"></label>
       <span class="divider optional"></span>
       <label class="field optional" title="Collage background"><span>BG</span><input id="background" type="color" value="#ffffff" aria-label="Background color"></label>
       <label class="field optional"><span>Gap fill</span><select id="gapFill"><option value="solid">Solid</option><option value="ambient">Ambient blur</option></select></label>
@@ -284,7 +285,7 @@
       app: $('#app'), fileInput: $('#fileInput'), addBtn: $('#addBtn'), chooseBtn: $('#chooseBtn'),
       urlBtn: $('#urlBtn'), emptyUrlBtn: $('#emptyUrlBtn'), shuffleBtn: $('#shuffleBtn'), variationBtn: $('#variationBtn'), clearBtn: $('#clearBtn'),
       layoutMode: $('#layoutMode'), sizePreset: $('#sizePreset'), canvasW: $('#canvasW'), canvasH: $('#canvasH'),
-      gap: $('#gap'), background: $('#background'), gapFill: $('#gapFill'), ambientBlur: $('#ambientBlur'), cropMode: $('#cropMode'),
+      gap: $('#gap'), padding: $('#padding'), background: $('#background'), gapFill: $('#gapFill'), ambientBlur: $('#ambientBlur'), cropMode: $('#cropMode'),
       copyBtn: $('#copyBtn'), exportBtn: $('#exportBtn'),
       imageCount: $('#imageCount'), trayList: $('#trayList'), selectedTools: $('#selectedTools'), selectedName: $('#selectedName'),
       focalX: $('#focalX'), focalY: $('#focalY'), cropHelp: $('#cropHelp'), resetFocalBtn: $('#resetFocalBtn'), previewWrap: $('#previewWrap'),
@@ -705,7 +706,9 @@
 
     function syncSettings() {
       const width = clamp(Number(refs.canvasW.value) || 1080, 64, 8000), height = clamp(Number(refs.canvasH.value) || 1080, 64, 8000);
-      state.canvas.width = width; state.canvas.height = height; state.canvas.gap = clamp(Number(refs.gap.value) || 0, 0, 200); state.canvas.background = refs.background.value;
+      const maxPadding = Math.floor((Math.min(width, height) - 1) / 2);
+      state.canvas.width = width; state.canvas.height = height; state.canvas.gap = clamp(Number(refs.gap.value) || 0, 0, 200);
+      state.canvas.padding = clamp(Number(refs.padding.value) || 0, 0, maxPadding); refs.padding.value = state.canvas.padding; state.canvas.background = refs.background.value;
       state.canvas.gapFill = refs.gapFill.value; state.canvas.ambientBlur = clamp(Number(refs.ambientBlur.value) || 24, 4, 100);
       refs.ambientBlur.disabled = state.canvas.gapFill !== 'ambient';
       state.layout.algorithm = refs.layoutMode.value; state.layout.cropMode = refs.cropMode.value;
@@ -803,7 +806,7 @@
     refs.copyBtn.addEventListener('click', () => copyCollage());
     refs.exportBtn.addEventListener('click', openExportDialog);
 
-    [refs.canvasW, refs.canvasH, refs.gap, refs.ambientBlur].forEach(input => input.addEventListener('input', scheduleSettings));
+    [refs.canvasW, refs.canvasH, refs.gap, refs.padding, refs.ambientBlur].forEach(input => input.addEventListener('input', scheduleSettings));
     [refs.background, refs.gapFill, refs.cropMode].forEach(input => input.addEventListener('change', syncSettings));
     refs.layoutMode.addEventListener('change', () => { state.layout.variation = 0; syncSettings(); });
     refs.sizePreset.addEventListener('change', () => { if (refs.sizePreset.value !== 'custom') { const [width, height] = refs.sizePreset.value.split('x'); refs.canvasW.value = width; refs.canvasH.value = height; syncSettings(); } });
