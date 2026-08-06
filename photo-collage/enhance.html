@@ -1,0 +1,1436 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Build and export photo collages locally in your browser.">
+  <title>Photo Collage</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f3f4f6;
+      --panel: #fff;
+      --line: #d9dce2;
+      --line-strong: #c4c8d0;
+      --text: #20242c;
+      --muted: #6b7280;
+      --accent: #315efb;
+      --accent-dark: #2149d8;
+      --danger: #ba2b2b;
+      --control-h: 32px;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      overflow: hidden;
+      font: 13px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--text);
+      background: var(--bg);
+    }
+    button, input, select { font: inherit; color: inherit; }
+    button, select, input[type="number"], input[type="text"] {
+      height: var(--control-h);
+      border: 1px solid var(--line-strong);
+      border-radius: 5px;
+      background: #fff;
+    }
+    button {
+      padding: 0 10px;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+    button:hover:not(:disabled) { border-color: #9299a6; background: #f7f8fa; }
+    button:focus-visible, input:focus-visible, select:focus-visible {
+      outline: 2px solid color-mix(in srgb, var(--accent) 45%, transparent);
+      outline-offset: 1px;
+    }
+    button:disabled { cursor: not-allowed; opacity: .45; }
+    button.primary { color: #fff; border-color: var(--accent); background: var(--accent); }
+    button.primary:hover:not(:disabled) { border-color: var(--accent-dark); background: var(--accent-dark); }
+    button.icon { width: 28px; height: 28px; padding: 0; border-color: transparent; background: transparent; }
+    input[type="number"] { width: 72px; padding: 0 7px; }
+    select { padding: 0 25px 0 8px; }
+
+    .app { height: 100%; display: grid; grid-template-rows: auto 1fr auto; }
+    .toolbar {
+      z-index: 5;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      min-height: 41px;
+      padding: 5px 8px;
+      border-bottom: 1px solid var(--line);
+      background: var(--panel);
+      flex-wrap: wrap;
+      overflow: visible;
+      font-size: 12px;
+    }
+    .toolbar button, .toolbar select, .toolbar input[type="number"] { height: 29px; }
+    .toolbar button { padding-inline: 8px; }
+    .toolbar input[type="number"] { width: 62px; padding-inline: 5px; }
+    .toolbar select { padding-left: 6px; padding-right: 21px; }
+    .brand { display: flex; align-items: center; gap: 6px; margin-right: 2px; font-weight: 650; white-space: nowrap; }
+    .brand-mark { display: grid; grid-template-columns: repeat(2, 6px); gap: 2px; }
+    .brand-mark i { width: 6px; height: 6px; border-radius: 1px; background: var(--accent); }
+    .divider { width: 1px; height: 21px; margin: 0 1px; background: var(--line); flex: 0 0 auto; }
+    .field { display: flex; align-items: center; gap: 3px; color: var(--muted); white-space: nowrap; }
+    .field input, .field select { color: var(--text); }
+    .size-preset { max-width: 108px; }
+    .toolbar-spacer { flex: 1 1 12px; min-width: 6px; }
+    .output-actions { display: flex; flex: 0 0 auto; align-items: center; gap: 4px; }
+
+    .workspace { min-height: 0; display: grid; grid-template-columns: 300px minmax(0, 1fr); }
+    .tray { min-height: 0; display: flex; flex-direction: column; border-right: 1px solid var(--line); background: var(--panel); }
+    .tray-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 10px 7px; }
+    .tray-title { font-weight: 650; }
+    .tray-list { min-height: 0; overflow: auto; padding: 0 7px 10px; }
+    .tray-empty { padding: 22px 8px; color: var(--muted); text-align: center; }
+    .thumb-row {
+      position: relative;
+      display: grid;
+      grid-template-columns: 16px 48px minmax(0, 1fr);
+      gap: 7px;
+      align-items: center;
+      min-height: 58px;
+      padding: 5px 3px;
+      border: 1px solid transparent;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    .thumb-row:hover { background: #f6f7f9; }
+    .thumb-row.selected { border-color: #a9baff; background: #f0f4ff; }
+    .feature-toggle { color: #8a909a; font-size: 16px; }
+    .feature-toggle.active { color: #d18a00; }
+    .thumb-row > .feature-toggle { position: absolute; right: 31px; bottom: 4px; }
+    .thumb-row > button[data-action="remove"] { position: absolute; right: 3px; bottom: 4px; }
+    .drag-handle { color: #9aa0aa; text-align: center; cursor: grab; user-select: none; }
+    .thumb { width: 48px; height: 46px; display: block; object-fit: cover; border: 1px solid var(--line); border-radius: 3px; background: #eee; }
+    .thumb-info { min-width: 0; }
+    .thumb-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+    .thumb-meta { margin-top: 2px; color: var(--muted); font-size: 11px; }
+    .remote-dot { color: #a75d00; }
+    .reorder-buttons { display: flex; gap: 3px; margin-top: 4px; }
+    .reorder-buttons button { height: 20px; padding: 0 6px; color: var(--muted); font-size: 11px; }
+    .selected-tools { padding: 9px 10px; border-top: 1px solid var(--line); }
+    .selected-tools[hidden] { display: none; }
+    .selected-title-row { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+    .selected-title-row .mobile-close, .mobile-edit { display: none; }
+    .selected-tools h2 { margin: 0 0 7px; font-size: 12px; }
+    .tool-section + .tool-section { margin-top: 11px; padding-top: 10px; border-top: 1px solid var(--line); }
+    .tool-section-head { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 2px; }
+    .tool-section-head h3 { margin: 0; color: var(--muted); font-size: 11px; letter-spacing: .04em; text-transform: uppercase; }
+    .tool-section-head button { height: 25px; padding-inline: 7px; font-size: 11px; }
+    .selected-tools .field { justify-content: space-between; margin-top: 6px; }
+    .selected-tools input[type="range"] { width: 112px; accent-color: var(--accent); }
+    .selected-tools input[type="range"]:disabled { opacity: .35; cursor: not-allowed; }
+    .adjust-field span:first-child { min-width: 62px; }
+    .adjust-field output { width: 25px; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+    .adjust-actions { display: flex; gap: 5px; margin-top: 9px; }
+    .adjust-actions button { flex: 1; padding-inline: 5px; }
+    .crop-help { min-height: 32px; margin: 7px 0; color: var(--muted); font-size: 11px; }
+
+    .preview-wrap {
+      position: relative;
+      min-width: 0;
+      min-height: 0;
+      display: grid;
+      place-items: center;
+      overflow: auto;
+      padding: 24px;
+      background-color: var(--bg);
+      background-image: radial-gradient(#cfd2d8 0.7px, transparent 0.7px);
+      background-size: 14px 14px;
+    }
+    .empty-state {
+      width: min(440px, calc(100% - 24px));
+      padding: 54px 30px;
+      border: 1px dashed #aeb4bf;
+      border-radius: 9px;
+      background: rgba(255,255,255,.78);
+      text-align: center;
+    }
+    .empty-icon { width: 48px; height: 40px; margin: 0 auto 15px; position: relative; border: 1.5px solid #858c98; border-radius: 5px; }
+    .empty-icon:before { content: ""; position: absolute; width: 8px; height: 8px; top: 7px; right: 8px; border: 1.5px solid #858c98; border-radius: 50%; }
+    .empty-icon:after { content: ""; position: absolute; width: 28px; height: 18px; left: 8px; bottom: 5px; border-left: 1.5px solid #858c98; border-bottom: 1.5px solid #858c98; transform: skew(-30deg) rotate(-39deg); }
+    .empty-state h1 { margin: 0 0 6px; font-size: 18px; font-weight: 650; }
+    .empty-state p { margin: 0 0 18px; color: var(--muted); }
+    .empty-actions { display: flex; justify-content: center; gap: 7px; }
+    .privacy { margin-top: 15px; color: #7b818b; font-size: 11px; }
+    .collage-shell { display: none; flex: 0 0 auto; overflow: hidden; background: #fff; box-shadow: 0 0 0 1px rgba(35,40,48,.18); }
+    .collage-shell.visible { display: block; }
+    .collage { position: relative; overflow: hidden; transform-origin: top left; }
+    .ambient-layer { position: absolute; inset: 0; overflow: hidden; pointer-events: none; transform: scale(1.04); transform-origin: center; }
+    .ambient-layer[hidden] { display: none; }
+    .ambient-photo { position: absolute; overflow: hidden; }
+    .ambient-photo img, .ambient-photo canvas, .photo-box img, .photo-box canvas { position: absolute; display: block; max-width: none; pointer-events: none; user-select: none; }
+    .photo-box { position: absolute; overflow: hidden; background: #e4e6e9; transition: outline-color .1s; }
+    .collage.crop-cover .photo-box { cursor: grab; touch-action: none; }
+    .collage.crop-cover .photo-box.dragging { cursor: grabbing; }
+    .photo-box.selected { outline: 2px solid var(--accent); outline-offset: -2px; z-index: 1; }
+    .photo-box:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; z-index: 1; }
+    .layout-handle { position: absolute; z-index: 3; height: auto; padding: 0; border: 0; border-radius: 0; background: transparent; touch-action: none; }
+    .layout-handle:hover:not(:disabled), .layout-handle:focus-visible { border: 0; background: transparent; outline: none; }
+    .layout-handle::after { content: ""; position: absolute; border-radius: 2px; background: var(--accent); opacity: .18; transition: opacity .12s, transform .12s; }
+    .layout-handle:hover::after, .layout-handle:focus-visible::after, .layout-handle.dragging::after { opacity: .9; }
+    .layout-handle.vertical { cursor: col-resize; }
+    .layout-handle.vertical::after { top: 2px; bottom: 2px; left: 50%; width: 2px; transform: translateX(-50%) scaleX(.75); }
+    .layout-handle.vertical:hover::after, .layout-handle.vertical:focus-visible::after, .layout-handle.vertical.dragging::after { transform: translateX(-50%) scaleX(1.5); }
+    .layout-handle.horizontal { cursor: row-resize; }
+    .layout-handle.horizontal::after { top: 50%; right: 2px; left: 2px; height: 2px; transform: translateY(-50%) scaleY(.75); }
+    .layout-handle.horizontal:hover::after, .layout-handle.horizontal:focus-visible::after, .layout-handle.horizontal.dragging::after { transform: translateY(-50%) scaleY(1.5); }
+    .drop-overlay { position: absolute; inset: 10px; z-index: 10; display: none; place-items: center; border: 2px dashed var(--accent); border-radius: 8px; color: var(--accent); background: rgba(240,244,255,.93); font-size: 17px; font-weight: 650; pointer-events: none; }
+    .preview-wrap.dragging .drop-overlay { display: grid; }
+    .layout-reset { position: absolute; top: 10px; right: 10px; z-index: 4; box-shadow: 0 1px 4px rgba(20,24,32,.12); }
+
+    .status { display: flex; justify-content: space-between; gap: 12px; min-height: 29px; padding: 6px 10px; border-top: 1px solid var(--line); color: var(--muted); background: var(--panel); font-size: 12px; }
+    .status-message.warning { color: #915700; }
+    .status-message.error { color: var(--danger); }
+
+    dialog { width: min(460px, calc(100% - 28px)); padding: 0; border: 1px solid var(--line-strong); border-radius: 8px; color: var(--text); box-shadow: 0 14px 45px rgba(0,0,0,.18); }
+    dialog::backdrop { background: rgba(32,36,44,.35); }
+    .dialog-head { display: flex; align-items: center; justify-content: space-between; padding: 11px 13px; border-bottom: 1px solid var(--line); font-weight: 650; }
+    .dialog-body { padding: 13px; }
+    .dialog-body p { margin: 0 0 8px; color: var(--muted); }
+    textarea { width: 100%; min-height: 142px; resize: vertical; padding: 8px; border: 1px solid var(--line-strong); border-radius: 5px; font: 12px/1.45 ui-monospace, monospace; }
+    .dialog-row { display: flex; align-items: center; gap: 8px; margin: 10px 0; }
+    .dialog-row label { width: 62px; color: var(--muted); }
+    .dialog-row select, .dialog-row input[type="number"] { flex: 1; }
+    .dialog-actions { display: flex; justify-content: flex-end; gap: 7px; padding: 11px 13px; border-top: 1px solid var(--line); }
+    @media (max-width: 780px) {
+      body { overflow: hidden; }
+      .brand span:last-child { display: none; }
+      .toolbar { padding-inline: 7px; row-gap: 6px; }
+      .size-preset, .toolbar .divider.optional, .toolbar .field.optional { display: none; }
+      .workspace { grid-template-columns: 1fr; grid-template-rows: minmax(0, 1fr) 112px; }
+      .preview-wrap { grid-row: 1; padding: 14px; }
+      .tray { grid-row: 2; border: 0; border-top: 1px solid var(--line); }
+      .tray-head { padding: 6px 9px 3px; }
+      .tray-list { display: flex; gap: 5px; overflow-x: auto; padding: 0 7px 6px; }
+      .tray-empty { width: 100%; padding: 15px; }
+      .thumb-row { flex: 0 0 72px; display: block; min-height: 68px; padding: 3px; text-align: center; }
+      .drag-handle, .thumb-row .icon:not(.feature-toggle), .thumb-meta, .reorder-buttons { display: none; }
+      .thumb { width: 64px; height: 48px; margin: auto; }
+      .thumb-name { margin-top: 2px; font-size: 10px; }
+      .thumb-row .feature-toggle { position: absolute; top: 1px; right: 1px; bottom: auto; width: 22px; height: 22px; padding: 0; background: rgba(255,255,255,.88); }
+      .selected-tools { display: none; }
+      .selected-tools.mobile-open:not([hidden]) { position: fixed; right: 0; bottom: 0; left: 0; z-index: 30; display: block; max-height: 72vh; overflow: auto; padding: 12px 14px 18px; background: var(--panel); box-shadow: 0 -8px 28px rgba(20,24,32,.18); }
+      .selected-title-row .mobile-close { display: block; }
+      .mobile-edit { position: absolute; right: 2px; bottom: 2px; display: block; height: 21px; padding: 0 5px; border: 0; background: rgba(255,255,255,.9); font-size: 10px; }
+      .status { white-space: nowrap; overflow: hidden; }
+      .status span { overflow: hidden; text-overflow: ellipsis; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app" id="app">
+    <header class="toolbar" aria-label="Collage controls">
+      <div class="brand" aria-label="Photo Collage"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span><span>Photo Collage</span></div>
+      <button id="addBtn" class="primary" type="button">+ Add</button>
+      <button id="urlBtn" type="button">URLs</button>
+      <button id="shuffleBtn" type="button" disabled title="Shuffle image order">Shuffle</button>
+      <button id="variationBtn" type="button" disabled title="Try another layout without changing image order">Variation</button>
+      <span class="divider"></span>
+      <label class="field"><span>Layout</span><select id="layoutMode"><option value="smart">Smart</option><option value="grid">Grid</option><option value="justified">Justified</option><option value="masonry">Masonry</option><option value="binary-tree">Binary tree</option></select></label>
+      <select id="sizePreset" class="size-preset" aria-label="Canvas size preset"><option value="1080x1080">Square</option><option value="1080x1350">Portrait</option><option value="1080x1920">Story</option><option value="1920x1080">Landscape</option><option value="custom">Custom</option></select>
+      <label class="field"><span>W</span><input id="canvasW" type="number" min="64" max="8000" value="1080" inputmode="numeric"></label>
+      <label class="field"><span>H</span><input id="canvasH" type="number" min="64" max="8000" value="1080" inputmode="numeric"></label>
+      <label class="field optional"><span>Gap</span><input id="gap" type="number" min="0" max="200" value="8" inputmode="numeric"></label>
+      <label class="field optional" title="Space between the photos and the canvas edge"><span>Outer</span><input id="padding" type="number" min="0" max="1000" value="16" inputmode="numeric" aria-label="Outer padding"></label>
+      <span class="divider optional"></span>
+      <label class="field optional" title="Collage background"><span>BG</span><input id="background" type="color" value="#ffffff" aria-label="Background color"></label>
+      <label class="field optional"><span>Gap fill</span><select id="gapFill"><option value="solid">Solid</option><option value="ambient">Ambient blur</option></select></label>
+      <label class="field optional"><span>Blur</span><input id="ambientBlur" type="number" min="4" max="100" value="24" inputmode="numeric" disabled></label>
+      <label class="field optional"><span>Fit</span><select id="cropMode"><option value="cover">Cover</option><option value="contain">Contain</option></select></label>
+      <span class="toolbar-spacer"></span>
+      <div class="output-actions" aria-label="Output actions">
+        <button id="copyBtn" type="button" disabled>Copy</button>
+        <button id="exportBtn" class="primary" type="button" disabled>Export</button>
+      </div>
+    </header>
+
+    <section class="workspace">
+      <aside class="tray" aria-label="Images">
+        <div class="tray-head"><span class="tray-title">Photos <span id="imageCount">0</span></span><button id="clearBtn" class="icon" type="button" aria-label="Remove all images" title="Remove all" disabled>×</button></div>
+        <div id="trayList" class="tray-list"><div class="tray-empty">Your photos will appear here.</div></div>
+        <section id="selectedTools" class="selected-tools" hidden>
+          <div class="selected-title-row"><h2 id="selectedName">Selected image</h2><button id="closeToolsBtn" class="icon mobile-close" type="button" aria-label="Close image adjustments">×</button></div>
+          <div class="tool-section">
+            <div class="tool-section-head"><h3>Crop</h3></div>
+            <label class="field"><span>Horizontal</span><input id="focalX" type="range" min="0" max="1" step="0.01" value="0.5"></label>
+            <label class="field"><span>Vertical</span><input id="focalY" type="range" min="0" max="1" step="0.01" value="0.5"></label>
+            <label class="field"><span>Zoom</span><input id="cropZoom" type="range" min="1" max="4" step="0.01" value="1"></label>
+            <p id="cropHelp" class="crop-help">Select a cropped image to adjust its visible area.</p>
+            <button id="resetCropBtn" type="button">Reset crop</button>
+          </div>
+          <div class="tool-section">
+            <div class="tool-section-head"><h3>Adjust</h3><button id="autoEnhanceBtn" type="button">Auto Enhance</button></div>
+            <label class="field adjust-field"><span>Exposure</span><input id="exposure" data-adjustment="exposure" type="range" min="-100" max="100" step="1" value="0"><output for="exposure">0</output></label>
+            <label class="field adjust-field"><span>Contrast</span><input id="contrast" data-adjustment="contrast" type="range" min="-100" max="100" step="1" value="0"><output for="contrast">0</output></label>
+            <label class="field adjust-field"><span>Vibrance</span><input id="vibrance" data-adjustment="vibrance" type="range" min="-100" max="100" step="1" value="0"><output for="vibrance">0</output></label>
+            <label class="field adjust-field"><span>Highlights</span><input id="highlights" data-adjustment="highlights" type="range" min="-100" max="100" step="1" value="0"><output for="highlights">0</output></label>
+            <label class="field adjust-field"><span>Shadows</span><input id="shadows" data-adjustment="shadows" type="range" min="-100" max="100" step="1" value="0"><output for="shadows">0</output></label>
+            <label class="field adjust-field"><span>Sharpness</span><input id="sharpness" data-adjustment="sharpness" type="range" min="0" max="100" step="1" value="0"><output for="sharpness">0</output></label>
+            <div class="adjust-actions"><button id="compareBtn" type="button" title="Hold to compare with the original">Hold to compare</button><button id="resetAdjustmentsBtn" type="button">Reset</button></div>
+          </div>
+        </section>
+      </aside>
+
+      <section id="previewWrap" class="preview-wrap" aria-label="Collage preview">
+        <div id="emptyState" class="empty-state">
+          <div class="empty-icon" aria-hidden="true"></div>
+          <h1>Drop photos here</h1>
+          <p>Build a balanced collage from images of any shape.</p>
+          <div class="empty-actions"><button id="chooseBtn" class="primary" type="button">Choose files</button><button id="emptyUrlBtn" type="button">Paste image URLs</button></div>
+          <div class="privacy">Photos stay on this device. Remote URLs are fetched by your browser.</div>
+        </div>
+        <div id="collageShell" class="collage-shell"><div id="collage" class="collage"></div></div>
+        <div class="drop-overlay">Drop to add photos</div>
+        <button id="resetLayoutBtn" class="layout-reset" type="button" title="Discard manual layout adjustments" hidden>Reset layout</button>
+      </section>
+    </section>
+
+    <footer class="status" aria-live="polite"><span id="statusSummary">Ready for photos</span><span id="statusMessage" class="status-message">Local-first · nothing is uploaded</span></footer>
+  </main>
+
+  <input id="fileInput" type="file" accept="image/*" multiple hidden>
+
+  <dialog id="urlDialog">
+    <form method="dialog">
+      <div class="dialog-head"><span>Add image URLs</span><button class="icon" value="cancel" aria-label="Close">×</button></div>
+      <div class="dialog-body"><p>Paste one direct image URL per line. Remote hosts must allow cross-origin access for export.</p><textarea id="urlInput" placeholder="https://example.com/photo.jpg&#10;https://example.com/another.webp"></textarea></div>
+      <div class="dialog-actions"><button value="cancel">Cancel</button><button id="loadUrlsBtn" class="primary" value="default">Add images</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="exportDialog">
+    <form method="dialog">
+      <div class="dialog-head"><span>Export collage</span><button class="icon" value="cancel" aria-label="Close">×</button></div>
+      <div class="dialog-body">
+        <div class="dialog-row"><label for="exportFormat">Format</label><select id="exportFormat"><option value="image/png">PNG</option><option value="image/jpeg">JPEG</option><option value="image/webp">WebP</option></select></div>
+        <div id="qualityRow" class="dialog-row" hidden><label for="exportQuality">Quality</label><input id="exportQuality" type="range" min="0.5" max="1" step="0.01" value="0.92"><output id="qualityValue">92%</output></div>
+        <div class="dialog-row"><label for="exportScale">Scale</label><select id="exportScale"><option value="1">1×</option><option value="2">2×</option><option value="0.5">0.5×</option></select></div>
+        <p id="exportNote">Export renders locally at 1080 × 1080 pixels.</p>
+      </div>
+      <div class="dialog-actions"><button value="cancel">Cancel</button><button id="downloadBtn" class="primary" value="default">Download</button></div>
+    </form>
+  </dialog>
+
+  <script>
+    'use strict';
+
+    const $ = (selector) => document.querySelector(selector);
+    const refs = {
+      fileInput: $('#fileInput'), addBtn: $('#addBtn'), chooseBtn: $('#chooseBtn'),
+      urlBtn: $('#urlBtn'), emptyUrlBtn: $('#emptyUrlBtn'), shuffleBtn: $('#shuffleBtn'), variationBtn: $('#variationBtn'), resetLayoutBtn: $('#resetLayoutBtn'), clearBtn: $('#clearBtn'),
+      layoutMode: $('#layoutMode'), sizePreset: $('#sizePreset'), canvasW: $('#canvasW'), canvasH: $('#canvasH'),
+      gap: $('#gap'), padding: $('#padding'), background: $('#background'), gapFill: $('#gapFill'), ambientBlur: $('#ambientBlur'), cropMode: $('#cropMode'),
+      copyBtn: $('#copyBtn'), exportBtn: $('#exportBtn'),
+      imageCount: $('#imageCount'), trayList: $('#trayList'), selectedTools: $('#selectedTools'), selectedName: $('#selectedName'),
+      closeToolsBtn: $('#closeToolsBtn'), focalX: $('#focalX'), focalY: $('#focalY'), cropZoom: $('#cropZoom'), cropHelp: $('#cropHelp'), resetCropBtn: $('#resetCropBtn'), previewWrap: $('#previewWrap'),
+      adjustmentInputs: [...document.querySelectorAll('[data-adjustment]')], autoEnhanceBtn: $('#autoEnhanceBtn'), compareBtn: $('#compareBtn'), resetAdjustmentsBtn: $('#resetAdjustmentsBtn'),
+      emptyState: $('#emptyState'), collageShell: $('#collageShell'), collage: $('#collage'),
+      statusSummary: $('#statusSummary'), statusMessage: $('#statusMessage'), urlDialog: $('#urlDialog'), urlInput: $('#urlInput'),
+      loadUrlsBtn: $('#loadUrlsBtn'), exportDialog: $('#exportDialog'), exportFormat: $('#exportFormat'),
+      exportQuality: $('#exportQuality'), qualityValue: $('#qualityValue'), qualityRow: $('#qualityRow'),
+      exportScale: $('#exportScale'), exportNote: $('#exportNote'), downloadBtn: $('#downloadBtn')
+    };
+
+    let state = {
+      images: [], selectedId: null, comparingId: null, errors: [], loading: 0, dragId: null,
+      canvas: { width: 1080, height: 1080, padding: 16, gap: 8, background: '#ffffff', gapFill: 'solid', ambientBlur: 24 },
+      layout: { algorithm: 'smart', cropMode: 'cover', variation: 0, manual: null },
+      computed: { boxes: [], algorithm: 'grid', score: 0 }
+    };
+
+    const uid = () => (crypto.randomUUID ? crypto.randomUUID() : `img_${Date.now()}_${Math.random().toString(36).slice(2)}`);
+    const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+    const defaultCrop = () => ({ focalX: .5, focalY: .5, zoom: 1 });
+    const defaultAdjustments = () => ({ exposure: 0, contrast: 0, vibrance: 0, highlights: 0, shadows: 0, sharpness: 0 });
+    const createImageState = properties => ({ id: uid(), featured: false, crop: defaultCrop(), adjustments: defaultAdjustments(), renderCache: { preview: null }, ...properties });
+    const hasAdjustments = image => Object.values(image.adjustments).some(value => value !== 0);
+    function disposeCanvas(canvas) { if (canvas) { canvas.width = 1; canvas.height = 1; } }
+    function disposeImageCache(image) {
+      if (!image?.renderCache) return;
+      disposeCanvas(image.renderCache.preview?.canvas); image.renderCache.preview = null;
+    }
+    const debounce = (fn, wait = 80) => { let timer; return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), wait); }; };
+    const escapeHtml = (value) => String(value).replace(/[&<>'"]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
+    const fileNameCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
+    const sortedFilePromises = (files, sourceType = 'file') => [...files]
+      .sort((a, b) => fileNameCollator.compare(a.name || '', b.name || ''))
+      .map(file => imageFromFile(file, sourceType));
+
+    function loadImageElement(src, crossOrigin) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        if (crossOrigin) img.crossOrigin = crossOrigin;
+        img.onload = async () => { try { await img.decode?.(); } catch (_) {} resolve(img); };
+        img.onerror = () => reject(new Error('Image could not be loaded'));
+        img.src = src;
+      });
+    }
+
+    async function imageFromFile(file, sourceType = 'file') {
+      if (!file.type.startsWith('image/')) throw new Error(`${file.name || 'Item'} is not an image`);
+      const src = URL.createObjectURL(file);
+      try {
+        const element = await loadImageElement(src);
+        return createImageState({
+          sourceType, src, fileName: file.name || (sourceType === 'clipboard' ? 'Pasted image' : 'Photo'),
+          naturalWidth: element.naturalWidth, naturalHeight: element.naturalHeight,
+          aspectRatio: element.naturalWidth / element.naturalHeight, exportSafe: true,
+          objectUrl: true, element
+        });
+      } catch (error) { URL.revokeObjectURL(src); throw error; }
+    }
+
+    async function imageFromUrl(rawUrl) {
+      let url;
+      try { url = new URL(rawUrl.trim()); } catch (_) { throw new Error('Invalid image URL'); }
+      if (!['http:', 'https:'].includes(url.protocol)) throw new Error('Only HTTP and HTTPS image URLs are supported');
+      let element;
+      let exportSafe = true;
+      try { element = await loadImageElement(url.href, 'anonymous'); }
+      catch (_) {
+        exportSafe = false;
+        element = await loadImageElement(url.href);
+      }
+      const fileName = decodeURIComponent(url.pathname.split('/').pop() || 'Remote image');
+      return createImageState({
+        sourceType: 'url', src: url.href, fileName,
+        naturalWidth: element.naturalWidth, naturalHeight: element.naturalHeight,
+        aspectRatio: element.naturalWidth / element.naturalHeight, exportSafe,
+        objectUrl: false, element
+      });
+    }
+
+    async function addItems(promises) {
+      if (!promises.length) return;
+      state.loading += promises.length;
+      state.errors = [];
+      renderStatus();
+      const results = await Promise.allSettled(promises);
+      results.forEach(result => {
+        if (result.status === 'fulfilled') { state.images.push(result.value); state.selectedId ||= result.value.id; }
+        else state.errors.push(result.reason?.message || 'An image could not be loaded');
+      });
+      state.loading -= promises.length; recompute(); render();
+    }
+
+    function removeImage(id) {
+      const index = state.images.findIndex(image => image.id === id);
+      if (index < 0) return;
+      const [image] = state.images.splice(index, 1);
+      disposeImageCache(image);
+      if (image.objectUrl) URL.revokeObjectURL(image.src);
+      if (state.comparingId === id) state.comparingId = null;
+      if (state.selectedId === id) state.selectedId = state.images[index]?.id || state.images[index - 1]?.id || null;
+      if (!state.images.length) releaseAdjustmentProcessor();
+      recompute(); render();
+    }
+
+    function clearImages() {
+      state.images.forEach(image => { disposeImageCache(image); if (image.objectUrl) URL.revokeObjectURL(image.src); });
+      state.images = []; state.selectedId = null; state.comparingId = null; state.errors = []; refs.selectedTools.classList.remove('mobile-open');
+      releaseAdjustmentProcessor();
+      recompute(); render();
+    }
+
+    function moveImage(from, to) {
+      if (from === to || from < 0 || to < 0 || from >= state.images.length || to >= state.images.length) return;
+      const [image] = state.images.splice(from, 1);
+      state.images.splice(to, 0, image);
+      recompute(); render();
+    }
+
+    function innerRect() {
+      const { width, height, padding } = state.canvas;
+      return { x: padding, y: padding, width: Math.max(1, width - padding * 2), height: Math.max(1, height - padding * 2) };
+    }
+
+    function gridLayout(images) {
+      const rect = innerRect(), n = images.length, gap = Math.min(state.canvas.gap, rect.width / (n * 2), rect.height / (n * 2));
+      const candidates = [];
+      for (let cols = 1; cols <= n; cols++) {
+        const rows = Math.ceil(n / cols);
+        const cellW = (rect.width - gap * (cols - 1)) / cols;
+        const cellH = (rect.height - gap * (rows - 1)) / rows;
+        if (cellW <= 0 || cellH <= 0) continue;
+        const empty = rows * cols - n;
+        const shapeCost = Math.abs(Math.log((cols / rows) / (rect.width / rect.height))) * 18;
+        const cropCost = images.reduce((sum, image) => sum + cropLoss(image.aspectRatio, cellW / cellH), 0) / n * 100;
+        const cost = cropCost + shapeCost + empty * 5;
+        candidates.push({ cols, rows, cellW, cellH, cost });
+      }
+      candidates.sort((a, b) => a.cost - b.cost);
+      const best = candidates[state.layout.variation % Math.min(3, candidates.length)];
+      const boxes = images.map((image, index) => ({ imageId: image.id, x: rect.x + (index % best.cols) * (best.cellW + gap), y: rect.y + Math.floor(index / best.cols) * (best.cellH + gap), width: best.cellW, height: best.cellH }));
+      return { boxes, algorithm: 'grid' };
+    }
+
+    function layoutRatio(image) { return image.aspectRatio * (image.featured ? 1.65 : 1); }
+
+    function justifiedLayout(images) {
+      const rect = innerRect(), n = images.length, gap = Math.min(state.canvas.gap, rect.width / (n * 2), rect.height / (n * 2));
+      const variationFactors = [1, .82, 1.18, .7, 1.35];
+      const baseTarget = rect.height / Math.max(1, Math.round(Math.sqrt(n / (rect.width / rect.height))));
+      const maxPerRow = Math.min(8, n), target = Math.max(60, baseTarget * variationFactors[state.layout.variation % variationFactors.length]);
+      const dp = Array(n + 1).fill(Infinity), previous = Array(n + 1).fill(0);
+      dp[0] = 0;
+      for (let end = 1; end <= n; end++) {
+        let ratioSum = 0;
+        for (let start = end - 1; start >= Math.max(0, end - maxPerRow); start--) {
+          ratioSum += layoutRatio(images[start]);
+          const count = end - start;
+          const rowH = (rect.width - gap * (count - 1)) / ratioSum;
+          const heightCost = Math.pow((rowH - target) / target, 2) * 100;
+          const orphan = count === 1 && n > 2 ? 20 : 0;
+          const extreme = rowH < 40 || rowH > rect.height * .65 ? 80 : 0;
+          const total = dp[start] + heightCost + orphan + extreme;
+          if (total < dp[end]) { dp[end] = total; previous[end] = start; }
+        }
+      }
+      const rows = [];
+      for (let end = n; end > 0;) { const start = previous[end]; rows.unshift(images.slice(start, end)); end = start; }
+      const naturalHeights = rows.map(row => (rect.width - gap * (row.length - 1)) / row.reduce((sum, image) => sum + layoutRatio(image), 0));
+      const scale = (rect.height - gap * (rows.length - 1)) / naturalHeights.reduce((sum, height) => sum + height, 0);
+      const boxes = []; let y = rect.y;
+      rows.forEach((row, rowIndex) => {
+        const rowH = naturalHeights[rowIndex] * scale;
+        const ratioTotal = row.reduce((sum, image) => sum + layoutRatio(image), 0);
+        const usableW = rect.width - gap * (row.length - 1); let x = rect.x;
+        row.forEach((image, index) => {
+          const width = index === row.length - 1 ? rect.x + rect.width - x : usableW * layoutRatio(image) / ratioTotal;
+          boxes.push({ imageId: image.id, x, y, width, height: rowH }); x += width + gap;
+        });
+        y += rowH + gap;
+      });
+      return { boxes, algorithm: 'justified' };
+    }
+
+    function rowCompositionLayout(images, rowSizes) {
+      const rect = innerRect(), n = images.length;
+      const gap = Math.min(state.canvas.gap, rect.width / (n * 2), rect.height / (n * 2));
+      const rows = []; let offset = 0;
+      rowSizes.forEach(size => { rows.push(images.slice(offset, offset + size)); offset += size; });
+      const naturalHeights = rows.map(row => (rect.width - gap * (row.length - 1)) / row.reduce((sum, image) => sum + layoutRatio(image), 0));
+      const availableHeight = Math.max(1, rect.height - gap * (rows.length - 1));
+      const scale = availableHeight / naturalHeights.reduce((sum, height) => sum + height, 0);
+      const boxes = []; let y = rect.y;
+      rows.forEach((row, rowIndex) => {
+        const rowH = naturalHeights[rowIndex] * scale;
+        const ratioTotal = row.reduce((sum, image) => sum + layoutRatio(image), 0);
+        const usableW = rect.width - gap * (row.length - 1); let x = rect.x;
+        row.forEach((image, index) => {
+          const width = index === row.length - 1 ? rect.x + rect.width - x : usableW * layoutRatio(image) / ratioTotal;
+          boxes.push({ imageId: image.id, x, y, width, height: rowH }); x += width + gap;
+        });
+        y += rowH + gap;
+      });
+      return { boxes, algorithm: 'smart-rows', rowSizes };
+    }
+
+    function enumerateRowCompositions(total, maxRowSize = 5) {
+      const results = [];
+      function visit(remaining, current) {
+        if (!remaining) { results.push([...current]); return; }
+        for (let size = 1; size <= Math.min(maxRowSize, remaining); size++) {
+          current.push(size); visit(remaining - size, current); current.pop();
+        }
+      }
+      visit(total, []);
+      return results;
+    }
+
+    function scoreRowComposition(layout, images) {
+      const sizes = layout.rowSizes, rowCount = sizes.length;
+      let score = scoreLayout(layout);
+      const idealRows = clamp(Math.round(Math.sqrt(images.length * state.canvas.height / state.canvas.width)), 1, images.length);
+      score += Math.abs(rowCount - idealRows) * 5;
+      if (rowCount >= 3 && sizes.every((size, index) => size === sizes[rowCount - 1 - index])) score -= 14;
+      let offset = 0;
+      sizes.forEach((size, rowIndex) => {
+        if (size === 1) {
+          const image = images[offset], isHero = image.featured || image.aspectRatio >= 1.45;
+          score += isHero ? -18 : 22;
+          if (isHero && rowIndex > 0 && rowIndex < rowCount - 1) score -= 10;
+        }
+        offset += size;
+      });
+      return score;
+    }
+
+    function smartRowCandidates(images) {
+      if (images.length > 10) return [];
+      return enumerateRowCompositions(images.length)
+        .filter(sizes => sizes.length <= 6)
+        .map(sizes => {
+          const layout = rowCompositionLayout(images, sizes);
+          return { ...layout, score: scoreRowComposition(layout, images) };
+        });
+    }
+
+    function binaryTreeLayout(images) {
+      const rect = innerRect(), n = images.length, gap = Math.min(state.canvas.gap, rect.width / (n * 2), rect.height / (n * 2)), boxes = [];
+      const variationTargets = [.5, .4, .6, .46, .54], targetShare = variationTargets[state.layout.variation % variationTargets.length];
+      const weight = image => Math.sqrt(image.aspectRatio) * (image.featured ? 2.2 : 1);
+      function split(group, region, depth = 0) {
+        if (group.length === 1) { boxes.push({ imageId: group[0].id, ...region }); return; }
+        let bestIndex = 1, bestDiff = Infinity, leftSum = 0;
+        const total = group.reduce((sum, image) => sum + weight(image), 0);
+        for (let i = 1; i < group.length; i++) { leftSum += weight(group[i - 1]); const diff = Math.abs(leftSum / total - targetShare); if (diff < bestDiff) { bestDiff = diff; bestIndex = i; } }
+        const first = group.slice(0, bestIndex), second = group.slice(bestIndex);
+        const firstWeight = first.reduce((sum, image) => sum + weight(image), 0) / total;
+        const regionAspect = region.width / region.height;
+        const alternateDirection = state.layout.variation > 0 && regionAspect > .65 && regionAspect < 1.55 && depth % 2 === state.layout.variation % 2;
+        const vertical = regionAspect > 1.05 ? !alternateDirection : alternateDirection;
+        if (vertical) {
+          const firstW = Math.max(1, (region.width - gap) * firstWeight);
+          split(first, { x: region.x, y: region.y, width: firstW, height: region.height }, depth + 1);
+          split(second, { x: region.x + firstW + gap, y: region.y, width: Math.max(1, region.width - firstW - gap), height: region.height }, depth + 1);
+        } else {
+          const firstH = Math.max(1, (region.height - gap) * firstWeight);
+          split(first, { x: region.x, y: region.y, width: region.width, height: firstH }, depth + 1);
+          split(second, { x: region.x, y: region.y + firstH + gap, width: region.width, height: Math.max(1, region.height - firstH - gap) }, depth + 1);
+        }
+      }
+      split(images, rect);
+      return { boxes, algorithm: 'binary-tree' };
+    }
+
+    function masonryLayout(images) {
+      const rect = innerRect(), n = images.length, gap = Math.min(state.canvas.gap, rect.width / (n * 2), rect.height / (n * 2)), aspect = rect.width / rect.height;
+      const columnOffsets = [0, 1, -1], baseCols = Math.round(Math.sqrt(images.length * aspect));
+      const cols = clamp(baseCols + columnOffsets[state.layout.variation % columnOffsets.length], 1, Math.min(7, images.length));
+      const colW = (rect.width - gap * (cols - 1)) / cols, heights = Array(cols).fill(0), raw = [];
+      images.forEach(image => {
+        const col = heights.indexOf(Math.min(...heights)); const height = colW / image.aspectRatio * (image.featured ? 1.75 : 1);
+        raw.push({ imageId: image.id, col, y: heights[col], width: colW, height }); heights[col] += height + gap;
+      });
+      const maxHeight = Math.max(...heights) - gap; const scaleY = rect.height / Math.max(1, maxHeight);
+      const boxes = raw.map(box => ({ imageId: box.imageId, x: rect.x + box.col * (colW + gap), y: rect.y + box.y * scaleY, width: colW, height: box.height * scaleY }));
+      return { boxes, algorithm: 'masonry' };
+    }
+
+    function cropLoss(sourceAspect, boxAspect) {
+      return sourceAspect > boxAspect ? 1 - boxAspect / sourceAspect : 1 - sourceAspect / boxAspect;
+    }
+
+    function scoreLayout(layout) {
+      if (!layout.boxes.length) return Infinity;
+      const canvasArea = state.canvas.width * state.canvas.height;
+      let crop = 0, tiny = 0, extremes = 0, featurePenalty = 0;
+      const averageArea = layout.boxes.reduce((sum, box) => sum + box.width * box.height, 0) / layout.boxes.length;
+      const featuredCount = state.images.filter(image => image.featured).length;
+      layout.boxes.forEach(box => {
+        const image = state.images.find(item => item.id === box.imageId);
+        crop += cropLoss(image.aspectRatio, box.width / box.height);
+        const area = box.width * box.height / canvasArea;
+        if (area < .025) tiny += (.025 - area) * 300;
+        const ar = box.width / box.height;
+        if (ar > 5 || ar < .2) extremes += 20;
+        if (image.featured && featuredCount < state.images.length && box.width * box.height < averageArea * 1.35) featurePenalty += 18;
+      });
+      const cropWeight = state.layout.cropMode === 'contain' ? 20 : 70;
+      return crop / layout.boxes.length * cropWeight + tiny + extremes + featurePenalty;
+    }
+
+    function layoutSignature() {
+      return [state.layout.algorithm, state.layout.variation, state.canvas.width, state.canvas.height, state.canvas.padding, state.canvas.gap, state.images.map(image => `${image.id}:${image.featured}`).join(',')].join('|');
+    }
+
+    function applyManualLayout() {
+      const manual = state.layout.manual;
+      if (!manual) return;
+      const currentIds = new Set(state.images.map(image => image.id));
+      if (manual.signature !== layoutSignature() || manual.boxes.length !== currentIds.size || manual.boxes.some(box => !currentIds.has(box.imageId))) {
+        state.layout.manual = null; return;
+      }
+      state.computed = { ...state.computed, boxes: manual.boxes.map(box => ({ ...box })), manual: true };
+    }
+
+    function recompute() {
+      if (!state.images.length) { state.layout.manual = null; state.computed = { boxes: [], algorithm: 'grid', score: 0 }; return; }
+      const mode = state.layout.algorithm;
+      const algorithms = { grid: gridLayout, justified: justifiedLayout, masonry: masonryLayout, 'binary-tree': binaryTreeLayout };
+      if (mode === 'smart') {
+        const hasFeatured = state.images.some(image => image.featured);
+        const candidates = smartRowCandidates(state.images);
+        const justified = justifiedLayout(state.images), binary = binaryTreeLayout(state.images);
+        candidates.push({ ...justified, score: scoreLayout(justified) });
+        candidates.push({ ...binary, score: scoreLayout(binary) });
+        if (!hasFeatured) candidates.push(gridLayout(state.images));
+        const ranked = candidates
+          .map(layout => ({ ...layout, score: Number.isFinite(layout.score) ? layout.score : scoreLayout(layout) }))
+          .sort((a, b) => a.score - b.score);
+        const variationCount = Math.min(15, ranked.length);
+        state.layout.variation %= variationCount;
+        state.computed = { ...ranked[state.layout.variation], variationCount };
+      } else {
+        const layout = algorithms[mode](state.images); state.computed = { ...layout, score: scoreLayout(layout) };
+      }
+      applyManualLayout();
+    }
+
+    function getPreviewScale() {
+      const availableW = Math.max(100, refs.previewWrap.clientWidth - 48), availableH = Math.max(100, refs.previewWrap.clientHeight - 48);
+      return Math.min(1, availableW / state.canvas.width, availableH / state.canvas.height);
+    }
+
+    function applyPixelAdjustments(context, width, height, adjustments) {
+      if (!Object.values(adjustments).some(value => value !== 0)) return;
+      const imageData = context.getImageData(0, 0, width, height), data = imageData.data;
+      const exposure = Math.pow(2, adjustments.exposure / 50);
+      const contrast = Math.pow(2, adjustments.contrast / 55);
+      const vibrance = adjustments.vibrance / 100;
+      const highlights = adjustments.highlights / 100 * .38;
+      const shadows = adjustments.shadows / 100 * .38;
+      for (let index = 0; index < data.length; index += 4) {
+        if (!data[index + 3]) continue;
+        let red = data[index] * exposure, green = data[index + 1] * exposure, blue = data[index + 2] * exposure;
+        red = (red - 127.5) * contrast + 127.5; green = (green - 127.5) * contrast + 127.5; blue = (blue - 127.5) * contrast + 127.5;
+        const luma = clamp((red * .2126 + green * .7152 + blue * .0722) / 255, 0, 1);
+        const tonalShift = shadows * Math.pow(1 - luma, 2) + highlights * Math.pow(luma, 2);
+        red += tonalShift * 255; green += tonalShift * 255; blue += tonalShift * 255;
+        const maximum = Math.max(red, green, blue), minimum = Math.min(red, green, blue), average = (red + green + blue) / 3;
+        const saturation = clamp((maximum - minimum) / 255, 0, 1);
+        const skinLike = red > green && green > blue && red - blue > 20 && red - green < 95;
+        const vibranceStrength = vibrance >= 0 ? vibrance * (1 - saturation) * (skinLike ? .4 : 1) * 1.8 : vibrance;
+        red += (red - average) * vibranceStrength; green += (green - average) * vibranceStrength; blue += (blue - average) * vibranceStrength;
+        data[index] = clamp(red, 0, 255); data[index + 1] = clamp(green, 0, 255); data[index + 2] = clamp(blue, 0, 255);
+      }
+      if (adjustments.sharpness > 0 && width > 2 && height > 2) {
+        const original = new Uint8ClampedArray(data), amount = adjustments.sharpness / 100 * 1.4;
+        for (let y = 1; y < height - 1; y++) {
+          for (let x = 1; x < width - 1; x++) {
+            const index = (y * width + x) * 4;
+            if (!original[index + 3]) continue;
+            for (let channel = 0; channel < 3; channel++) {
+              const blur = (original[index - 4 + channel] + original[index + 4 + channel] + original[index - width * 4 + channel] + original[index + width * 4 + channel]) / 4;
+              data[index + channel] = clamp(original[index + channel] + (original[index + channel] - blur) * amount, 0, 255);
+            }
+          }
+        }
+      }
+      context.putImageData(imageData, 0, 0);
+    }
+
+    let adjustmentProcessor = null;
+    function releaseAdjustmentProcessor() {
+      if (adjustmentProcessor?.gl) adjustmentProcessor.gl.getExtension('WEBGL_lose_context')?.loseContext();
+      if (adjustmentProcessor?.canvas) disposeCanvas(adjustmentProcessor.canvas);
+      adjustmentProcessor = null;
+    }
+    function getAdjustmentProcessor() {
+      if (adjustmentProcessor !== null) return adjustmentProcessor;
+      const canvas = document.createElement('canvas'), gl = canvas.getContext('webgl', { alpha: true, antialias: false, preserveDrawingBuffer: false });
+      if (!gl) { adjustmentProcessor = false; return adjustmentProcessor; }
+      const vertexSource = `
+        attribute vec2 position; attribute vec2 textureCoordinate; varying vec2 uv;
+        void main() { uv = textureCoordinate; gl_Position = vec4(position, 0.0, 1.0); }
+      `;
+      const fragmentSource = `
+        precision highp float;
+        uniform sampler2D image; uniform vec2 pixel; uniform vec4 primary; uniform vec3 tonal;
+        varying vec2 uv;
+        vec3 corrected(vec3 color) {
+          color *= exp2(primary.x / 50.0);
+          color = (color - .5) * exp2(primary.y / 55.0) + .5;
+          float light = clamp(dot(color, vec3(.2126, .7152, .0722)), 0.0, 1.0);
+          color += tonal.y * .0038 * pow(1.0 - light, 2.0) + tonal.x * .0038 * pow(light, 2.0);
+          float maximum = max(color.r, max(color.g, color.b));
+          float minimum = min(color.r, min(color.g, color.b));
+          float saturation = clamp(maximum - minimum, 0.0, 1.0), average = (color.r + color.g + color.b) / 3.0;
+          float skin = step(color.g, color.r) * step(color.b, color.g) * step(.078, color.r - color.b) * step(color.r - color.g, .373);
+          float vibrance = primary.z / 100.0;
+          float strength = vibrance >= 0.0 ? vibrance * (1.0 - saturation) * mix(1.8, .72, skin) : vibrance;
+          return clamp(color + (color - vec3(average)) * strength, 0.0, 1.0);
+        }
+        void main() {
+          vec4 source = texture2D(image, uv);
+          if (source.a == 0.0) { gl_FragColor = source; return; }
+          vec3 color = corrected(source.rgb);
+          if (tonal.z > 0.0) {
+            vec3 blur = (corrected(texture2D(image, uv + vec2(pixel.x, 0.0)).rgb) + corrected(texture2D(image, uv - vec2(pixel.x, 0.0)).rgb) + corrected(texture2D(image, uv + vec2(0.0, pixel.y)).rgb) + corrected(texture2D(image, uv - vec2(0.0, pixel.y)).rgb)) * .25;
+            color = clamp(color + (color - blur) * tonal.z / 100.0 * 1.4, 0.0, 1.0);
+          }
+          gl_FragColor = vec4(color, source.a);
+        }
+      `;
+      const compile = (type, source) => { const shader = gl.createShader(type); gl.shaderSource(shader, source); gl.compileShader(shader); if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(shader)); return shader; };
+      try {
+        const program = gl.createProgram(); gl.attachShader(program, compile(gl.VERTEX_SHADER, vertexSource)); gl.attachShader(program, compile(gl.FRAGMENT_SHADER, fragmentSource)); gl.linkProgram(program);
+        if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(program));
+        gl.useProgram(program);
+        const buffer = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1,0,0, 1,-1,1,0, -1,1,0,1, -1,1,0,1, 1,-1,1,0, 1,1,1,1]), gl.STATIC_DRAW);
+        const position = gl.getAttribLocation(program, 'position'), textureCoordinate = gl.getAttribLocation(program, 'textureCoordinate');
+        gl.enableVertexAttribArray(position); gl.vertexAttribPointer(position, 2, gl.FLOAT, false, 16, 0);
+        gl.enableVertexAttribArray(textureCoordinate); gl.vertexAttribPointer(textureCoordinate, 2, gl.FLOAT, false, 16, 8);
+        const texture = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        adjustmentProcessor = { canvas, gl, program, texture, pixel: gl.getUniformLocation(program, 'pixel'), primary: gl.getUniformLocation(program, 'primary'), tonal: gl.getUniformLocation(program, 'tonal') };
+      } catch (_) { adjustmentProcessor = false; }
+      return adjustmentProcessor;
+    }
+
+    function applyWebGLAdjustments(context, sourceCanvas, adjustments) {
+      const processor = getAdjustmentProcessor(); if (!processor) return false;
+      try {
+        const { canvas, gl, pixel, primary, tonal } = processor, width = sourceCanvas.width, height = sourceCanvas.height;
+        if (width > gl.getParameter(gl.MAX_TEXTURE_SIZE) || height > gl.getParameter(gl.MAX_TEXTURE_SIZE)) return false;
+        if (canvas.width !== width) canvas.width = width;
+        if (canvas.height !== height) canvas.height = height;
+        gl.viewport(0, 0, width, height); gl.useProgram(processor.program); gl.bindTexture(gl.TEXTURE_2D, processor.texture);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, sourceCanvas);
+        gl.uniform2f(pixel, 1 / width, 1 / height); gl.uniform4f(primary, adjustments.exposure, adjustments.contrast, adjustments.vibrance, 0);
+        gl.uniform3f(tonal, adjustments.highlights, adjustments.shadows, adjustments.sharpness); gl.drawArrays(gl.TRIANGLES, 0, 6); gl.flush();
+        context.clearRect(0, 0, width, height); context.drawImage(canvas, 0, 0); return true;
+      } catch (_) { return false; }
+    }
+
+    function adjustmentKey(adjustments) { return ['exposure', 'contrast', 'vibrance', 'highlights', 'shadows', 'sharpness'].map(key => adjustments[key]).join('|'); }
+
+    function getAdjustedPreviewSource(image, adjustments) {
+      const maxDimension = Math.min(1024, Math.max(image.naturalWidth, image.naturalHeight));
+      const key = `${adjustmentKey(adjustments)}|${maxDimension}`;
+      if (image.renderCache.preview?.key === key) return image.renderCache.preview.canvas;
+      disposeImageCache(image);
+      const scale = Math.min(1, maxDimension / Math.max(image.naturalWidth, image.naturalHeight));
+      const canvas = document.createElement('canvas'); canvas.width = Math.max(1, Math.round(image.naturalWidth * scale)); canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+      const context = canvas.getContext('2d'); context.imageSmoothingEnabled = true; context.imageSmoothingQuality = 'high';
+      context.drawImage(image.element, 0, 0, canvas.width, canvas.height);
+      try { if (!applyWebGLAdjustments(context, canvas, adjustments)) applyPixelAdjustments(context, canvas.width, canvas.height, adjustments); }
+      catch (_) { /* Cross-origin preview-only images cannot expose pixels. */ }
+      image.renderCache.preview = { key, canvas }; return canvas;
+    }
+
+    function drawSourceToCanvas(context, source, image, box, mode, width, height) {
+      if (mode === 'cover') {
+        const crop = getCoverCropRect(image, box), scaleX = source.width / image.naturalWidth, scaleY = source.height / image.naturalHeight;
+        context.drawImage(source, crop.sx * scaleX, crop.sy * scaleY, crop.sw * scaleX, crop.sh * scaleY, 0, 0, width, height);
+      } else {
+        const fit = Math.min(width / source.width, height / source.height), drawW = source.width * fit, drawH = source.height * fit;
+        context.drawImage(source, (width - drawW) / 2, (height - drawH) / 2, drawW, drawH);
+      }
+    }
+
+    function renderImageCanvas(canvas, image, box, mode = state.layout.cropMode, pixelScale = 1, adjustments = image.adjustments, fillBox = true, usePreviewCache = true) {
+      const width = Math.max(1, Math.round(box.width * pixelScale)), height = Math.max(1, Math.round(box.height * pixelScale));
+      if (canvas.width !== width) canvas.width = width;
+      if (canvas.height !== height) canvas.height = height;
+      if (fillBox) Object.assign(canvas.style, { left: '0', top: '0', width: '100%', height: '100%' });
+      const context = canvas.getContext('2d');
+      context.clearRect(0, 0, width, height); context.imageSmoothingEnabled = true; context.imageSmoothingQuality = 'high';
+      if (usePreviewCache && Object.values(adjustments).some(value => value !== 0)) drawSourceToCanvas(context, getAdjustedPreviewSource(image, adjustments), image, box, mode, width, height);
+      else {
+        drawSourceToCanvas(context, image.element, image, box, mode, width, height);
+        try { if (Object.values(adjustments).some(value => value !== 0) && !applyWebGLAdjustments(context, canvas, adjustments)) applyPixelAdjustments(context, width, height, adjustments); }
+        catch (_) { /* Cross-origin preview-only images cannot expose pixels. */ }
+      }
+      return canvas;
+    }
+
+    function applyImageCrop(img, image, box, mode = state.layout.cropMode) {
+      if (mode === 'contain') { Object.assign(img.style, { left: '0', top: '0', width: '100%', height: '100%', objectFit: 'contain' }); return; }
+      const { sx, sy, sw, sh } = getCoverCropRect(image, box);
+      Object.assign(img.style, { left: `${-sx * box.width / sw}px`, top: `${-sy * box.height / sh}px`, width: `${image.naturalWidth * box.width / sw}px`, height: `${image.naturalHeight * box.height / sh}px`, objectFit: 'fill' });
+    }
+
+    function effectiveAdjustments(image) { return state.comparingId === image.id ? defaultAdjustments() : image.adjustments; }
+    function previewPixelScale() { return Math.min(1, getPreviewScale() * Math.min(2, window.devicePixelRatio || 1)); }
+
+    function updateCropPreview(image, includeAmbient = true) {
+      const box = state.computed.boxes.find(item => item.imageId === image.id);
+      if (!box) return;
+      refs.collage.querySelectorAll(`[data-image-id="${CSS.escape(image.id)}"]`).forEach(node => {
+        const ambient = node.classList.contains('ambient-photo'); if (ambient && !includeAmbient) return;
+        const mode = ambient ? 'cover' : state.layout.cropMode, adjustments = effectiveAdjustments(image), wantsCanvas = Object.values(adjustments).some(value => value !== 0);
+        let media = node.querySelector('img, canvas');
+        if (wantsCanvas && media?.tagName !== 'CANVAS') { media = document.createElement('canvas'); media.setAttribute('aria-hidden', 'true'); node.replaceChildren(media); }
+        else if (!wantsCanvas && media?.tagName !== 'IMG') { media = document.createElement('img'); media.src = image.src; media.alt = ''; node.replaceChildren(media); }
+        if (wantsCanvas) renderImageCanvas(media, image, box, mode, previewPixelScale(), adjustments);
+        else applyImageCrop(media, image, box, mode);
+      });
+    }
+
+    let layoutHandles = [];
+    function findLayoutHandles(boxes) {
+      const tolerance = 1, maxGap = state.canvas.gap + tolerance, segments = [];
+      const addSegment = (orientation, coord, start, end, beforeId, afterId) => {
+        if (end - start > tolerance) segments.push({ orientation, coord, start, end, beforeIds: new Set([beforeId]), afterIds: new Set([afterId]) });
+      };
+      for (let i = 0; i < boxes.length; i++) {
+        for (let j = i + 1; j < boxes.length; j++) {
+          const a = boxes[i], b = boxes[j], aRight = a.x + a.width, bRight = b.x + b.width, aBottom = a.y + a.height, bBottom = b.y + b.height;
+          const overlapY = [Math.max(a.y, b.y), Math.min(aBottom, bBottom)], overlapX = [Math.max(a.x, b.x), Math.min(aRight, bRight)];
+          if (b.x - aRight >= -tolerance && b.x - aRight <= maxGap) addSegment('vertical', (aRight + b.x) / 2, ...overlapY, a.imageId, b.imageId);
+          else if (a.x - bRight >= -tolerance && a.x - bRight <= maxGap) addSegment('vertical', (bRight + a.x) / 2, ...overlapY, b.imageId, a.imageId);
+          if (b.y - aBottom >= -tolerance && b.y - aBottom <= maxGap) addSegment('horizontal', (aBottom + b.y) / 2, ...overlapX, a.imageId, b.imageId);
+          else if (a.y - bBottom >= -tolerance && a.y - bBottom <= maxGap) addSegment('horizontal', (bBottom + a.y) / 2, ...overlapX, b.imageId, a.imageId);
+        }
+      }
+      const groups = [];
+      segments.sort((a, b) => a.orientation.localeCompare(b.orientation) || a.coord - b.coord || a.start - b.start);
+      segments.forEach(segment => {
+        const group = groups.find(item => item.orientation === segment.orientation && Math.abs(item.coord - segment.coord) <= tolerance && segment.start <= item.end + maxGap);
+        if (!group) { groups.push(segment); return; }
+        group.start = Math.min(group.start, segment.start); group.end = Math.max(group.end, segment.end);
+        segment.beforeIds.forEach(id => group.beforeIds.add(id)); segment.afterIds.forEach(id => group.afterIds.add(id));
+      });
+      return groups;
+    }
+
+    function renderLayoutHandles() {
+      layoutHandles = findLayoutHandles(state.computed.boxes);
+      const hitSize = 14 / getPreviewScale();
+      return layoutHandles.map((handle, index) => {
+        const node = document.createElement('button'); node.type = 'button'; node.className = `layout-handle ${handle.orientation}`;
+        node.dataset.handleIndex = index; node.setAttribute('role', 'separator'); node.setAttribute('aria-orientation', handle.orientation);
+        node.setAttribute('aria-label', `${handle.orientation === 'vertical' ? 'Vertical' : 'Horizontal'} layout divider. Drag or use arrow keys to resize.`);
+        node.title = 'Drag to resize layout · double-click to reset layout';
+        if (handle.orientation === 'vertical') Object.assign(node.style, { left: `${handle.coord - hitSize / 2}px`, top: `${handle.start}px`, width: `${hitSize}px`, height: `${handle.end - handle.start}px` });
+        else Object.assign(node.style, { left: `${handle.start}px`, top: `${handle.coord - hitSize / 2}px`, width: `${handle.end - handle.start}px`, height: `${hitSize}px` });
+        return node;
+      });
+    }
+
+    function renderPreview() {
+      const hasImages = state.images.length > 0;
+      refs.emptyState.hidden = hasImages;
+      refs.collageShell.classList.toggle('visible', hasImages);
+      if (!hasImages) { refs.collage.replaceChildren(); return; }
+      const scale = getPreviewScale();
+      refs.collageShell.style.width = `${state.canvas.width * scale}px`;
+      refs.collageShell.style.height = `${state.canvas.height * scale}px`;
+      Object.assign(refs.collage.style, { width: `${state.canvas.width}px`, height: `${state.canvas.height}px`, transform: `scale(${scale})`, background: state.canvas.background });
+      refs.collage.classList.toggle('crop-cover', state.layout.cropMode === 'cover');
+      const makeMedia = (image, box, mode) => {
+        const adjustments = effectiveAdjustments(image);
+        if (!Object.values(adjustments).some(value => value !== 0)) {
+          const img = document.createElement('img'); img.src = image.src; img.alt = ''; applyImageCrop(img, image, box, mode); return img;
+        }
+        const canvas = document.createElement('canvas'); renderImageCanvas(canvas, image, box, mode, previewPixelScale(), adjustments); return canvas;
+      };
+      const previewNodes = [];
+      if (state.canvas.gapFill === 'ambient') {
+        const ambientLayer = document.createElement('div'); ambientLayer.className = 'ambient-layer'; ambientLayer.style.filter = `blur(${state.canvas.ambientBlur}px)`;
+        ambientLayer.replaceChildren(...state.computed.boxes.map(box => {
+          const image = state.images.find(item => item.id === box.imageId), node = document.createElement('div'); node.className = 'ambient-photo'; node.dataset.imageId = image.id;
+          Object.assign(node.style, { left: `${box.x}px`, top: `${box.y}px`, width: `${box.width}px`, height: `${box.height}px` });
+          node.append(makeMedia(image, box, 'cover')); return node;
+        }));
+        previewNodes.push(ambientLayer);
+      }
+      const photoNodes = state.computed.boxes.map(box => {
+        const image = state.images.find(item => item.id === box.imageId), node = document.createElement('div');
+        node.className = `photo-box${image.id === state.selectedId ? ' selected' : ''}`;
+        node.dataset.id = image.id; node.dataset.imageId = image.id; node.tabIndex = 0; node.setAttribute('role', 'group');
+        node.setAttribute('aria-label', `${image.fileName}. Drag to reposition, scroll or use plus and minus to zoom.`);
+        Object.assign(node.style, { left: `${box.x}px`, top: `${box.y}px`, width: `${box.width}px`, height: `${box.height}px` });
+        const media = makeMedia(image, box, state.layout.cropMode); media.setAttribute('aria-hidden', 'true'); node.append(media);
+        return node;
+      });
+      refs.collage.replaceChildren(...previewNodes, ...photoNodes, ...renderLayoutHandles());
+    }
+
+    function syncCropControls(image) {
+      refs.selectedName.textContent = image.fileName;
+      refs.focalX.value = image.crop.focalX; refs.focalY.value = image.crop.focalY; refs.cropZoom.value = image.crop.zoom;
+      refs.adjustmentInputs.forEach(input => {
+        input.value = image.adjustments[input.dataset.adjustment];
+        input.nextElementSibling.textContent = input.value;
+      });
+      refs.resetAdjustmentsBtn.disabled = !hasAdjustments(image);
+      const box = state.computed.boxes.find(item => item.imageId === image.id);
+      const crop = box ? getCoverCropRect(image, box) : null;
+      const canCrop = state.layout.cropMode === 'cover' && Boolean(crop);
+      refs.focalX.disabled = !canCrop || crop.sw >= image.naturalWidth - .5;
+      refs.focalY.disabled = !canCrop || crop.sh >= image.naturalHeight - .5;
+      refs.cropZoom.disabled = !canCrop;
+      refs.resetCropBtn.disabled = !canCrop || (image.crop.zoom === 1 && image.crop.focalX === .5 && image.crop.focalY === .5);
+      refs.cropHelp.textContent = canCrop
+        ? 'Drag to reposition · scroll or pinch to zoom · arrows nudge · +/− zoom.'
+        : 'Contain shows the whole image; switch Fit to Cover to crop it.';
+    }
+
+    function renderThumbnail(image) {
+      const canvas = refs.trayList.querySelector(`[data-thumb-id="${CSS.escape(image.id)}"]`); if (!canvas) return;
+      renderImageCanvas(canvas, image, { width: 48, height: 46 }, 'cover', 2, effectiveAdjustments(image), false);
+    }
+
+    function renderTray() {
+      refs.imageCount.textContent = state.images.length;
+      if (!state.images.length) { refs.trayList.innerHTML = '<div class="tray-empty">Your photos will appear here.</div>'; }
+      else {
+        refs.trayList.innerHTML = state.images.map((image, index) => `
+          <div class="thumb-row${image.id === state.selectedId ? ' selected' : ''}" data-id="${image.id}" draggable="true" tabindex="0" aria-label="${escapeHtml(image.fileName)}, image ${index + 1} of ${state.images.length}">
+            <span class="drag-handle" aria-hidden="true">⠿</span>
+            <canvas class="thumb" data-thumb-id="${image.id}" width="96" height="92" aria-hidden="true"></canvas>
+            <div class="thumb-info"><div class="thumb-name" title="${escapeHtml(image.fileName)}">${escapeHtml(image.fileName)}</div><div class="thumb-meta">${image.naturalWidth}×${image.naturalHeight}${hasAdjustments(image) ? ' · adjusted' : ''}${!image.exportSafe ? ' · <span class="remote-dot">preview only</span>' : ''}</div><div class="reorder-buttons"><button data-action="up" aria-label="Move ${escapeHtml(image.fileName)} up" ${index === 0 ? 'disabled' : ''}>↑</button><button data-action="down" aria-label="Move ${escapeHtml(image.fileName)} down" ${index === state.images.length - 1 ? 'disabled' : ''}>↓</button></div></div>
+            <button class="icon feature-toggle${image.featured ? ' active' : ''}" data-action="feature" aria-label="${image.featured ? 'Unfeature' : 'Feature'} ${escapeHtml(image.fileName)}" aria-pressed="${image.featured}" title="${image.featured ? 'Remove featured status' : 'Give this image more space'}">${image.featured ? '★' : '☆'}</button>
+            <button class="icon" data-action="remove" aria-label="Remove ${escapeHtml(image.fileName)}" title="Remove">×</button>
+            <button class="mobile-edit" data-action="edit" aria-label="Edit ${escapeHtml(image.fileName)}">Edit</button>
+          </div>`).join('');
+        refs.trayList.querySelectorAll('[data-thumb-id]').forEach(canvas => {
+          const image = state.images.find(item => item.id === canvas.dataset.thumbId);
+          renderImageCanvas(canvas, image, { width: 48, height: 46 }, 'cover', 2, effectiveAdjustments(image), false);
+        });
+      }
+      const selected = state.images.find(image => image.id === state.selectedId);
+      refs.selectedTools.hidden = !selected;
+      if (selected) syncCropControls(selected);
+    }
+
+    function renderStatus() {
+      const n = state.images.length, remoteUnsafe = state.images.filter(image => !image.exportSafe).length, featured = state.images.filter(image => image.featured).length, adjusted = state.images.filter(hasAdjustments).length;
+      const computedLabel = state.computed.rowSizes ? `Rows ${state.computed.rowSizes.join('-')}` : labelFor(state.computed.algorithm);
+      refs.statusSummary.textContent = n ? `${n} image${n === 1 ? '' : 's'}${featured ? ` · ${featured} featured` : ''}${adjusted ? ` · ${adjusted} adjusted` : ''} · ${state.canvas.width}×${state.canvas.height} · ${state.layout.algorithm === 'smart' ? `Smart (${computedLabel})` : labelFor(state.layout.algorithm)}${state.layout.variation ? ` · variation ${state.layout.variation + 1}` : ''}${state.layout.manual ? ' · edited' : ''}` : 'Ready for photos';
+      refs.statusMessage.className = 'status-message';
+      if (state.loading) refs.statusMessage.textContent = `Loading ${state.loading} image${state.loading === 1 ? '' : 's'}…`;
+      else if (state.errors.length) { refs.statusMessage.textContent = state.errors[state.errors.length - 1]; refs.statusMessage.classList.add('error'); }
+      else if (remoteUnsafe) { refs.statusMessage.textContent = `${remoteUnsafe} remote image${remoteUnsafe === 1 ? ' may' : 's may'} block export`; refs.statusMessage.classList.add('warning'); }
+      else if (state.canvas.width * state.canvas.height > 32_000_000) { refs.statusMessage.textContent = 'Large exports may be slow in this browser'; refs.statusMessage.classList.add('warning'); }
+      else refs.statusMessage.textContent = 'Local-first · nothing is uploaded';
+    }
+
+    function labelFor(value) { return ({ grid: 'Grid', justified: 'Justified', masonry: 'Masonry', 'binary-tree': 'Binary tree', 'smart-rows': 'Row composition' })[value] || value; }
+    function render() {
+      const hasImages = state.images.length > 0;
+      const exportBlocked = state.images.some(image => !image.exportSafe);
+      refs.shuffleBtn.disabled = state.images.length < 2; refs.variationBtn.disabled = state.images.length < 2; refs.clearBtn.disabled = !hasImages;
+      refs.resetLayoutBtn.hidden = !state.layout.manual;
+      refs.copyBtn.disabled = !hasImages || exportBlocked; refs.exportBtn.disabled = !hasImages;
+      const quickActionTitle = exportBlocked ? 'A remote image is preview-only and cannot be rendered safely' : '';
+      refs.copyBtn.title = quickActionTitle;
+      renderTray(); renderPreview(); renderStatus();
+    }
+
+    function syncSettings() {
+      const width = clamp(Number(refs.canvasW.value) || 1080, 64, 8000), height = clamp(Number(refs.canvasH.value) || 1080, 64, 8000);
+      const maxPadding = Math.floor((Math.min(width, height) - 1) / 2);
+      state.canvas.width = width; state.canvas.height = height; state.canvas.gap = clamp(Number(refs.gap.value) || 0, 0, 200);
+      state.canvas.padding = clamp(Number(refs.padding.value) || 0, 0, maxPadding); refs.padding.value = state.canvas.padding; state.canvas.background = refs.background.value;
+      state.canvas.gapFill = refs.gapFill.value; state.canvas.ambientBlur = clamp(Number(refs.ambientBlur.value) || 24, 4, 100);
+      refs.ambientBlur.disabled = state.canvas.gapFill !== 'ambient';
+      state.layout.algorithm = refs.layoutMode.value; state.layout.cropMode = refs.cropMode.value;
+      refs.sizePreset.value = [...refs.sizePreset.options].some(option => option.value === `${width}x${height}`) ? `${width}x${height}` : 'custom';
+      recompute(); render();
+    }
+    const scheduleSettings = debounce(syncSettings);
+
+    function getCoverCropRect(image, box, crop = image.crop) {
+      const srcW = image.naturalWidth, srcH = image.naturalHeight, srcAspect = srcW / srcH, dstAspect = box.width / box.height;
+      let sw, sh;
+      if (srcAspect > dstAspect) { sh = srcH; sw = sh * dstAspect; } else { sw = srcW; sh = sw / dstAspect; }
+      const zoom = clamp(crop.zoom || 1, 1, 4);
+      sw /= zoom; sh /= zoom;
+      return { sx: (srcW - sw) * crop.focalX, sy: (srcH - sh) * crop.focalY, sw, sh };
+    }
+
+    function drawProcessedImage(context, image, box, scale, mode = state.layout.cropMode) {
+      const rendered = document.createElement('canvas');
+      renderImageCanvas(rendered, image, box, mode, scale, image.adjustments, false, false);
+      context.drawImage(rendered, box.x * scale, box.y * scale, box.width * scale, box.height * scale);
+      disposeCanvas(rendered);
+    }
+
+    async function exportCanvas(type, quality, scale) {
+      const width = Math.round(state.canvas.width * scale), height = Math.round(state.canvas.height * scale);
+      if (width > 8000 || height > 8000 || width * height > 64_000_000) throw new Error('Export exceeds the 8000px / 64 megapixel safety limit');
+      const canvas = document.createElement('canvas'); canvas.width = width; canvas.height = height;
+      const context = canvas.getContext('2d'); context.fillStyle = state.canvas.background; context.fillRect(0, 0, width, height); context.imageSmoothingQuality = 'high';
+      if (state.canvas.gapFill === 'ambient') {
+        const backdrop = document.createElement('canvas'); backdrop.width = width; backdrop.height = height;
+        const backdropContext = backdrop.getContext('2d'); backdropContext.imageSmoothingQuality = 'high';
+        state.computed.boxes.forEach(box => drawProcessedImage(backdropContext, state.images.find(item => item.id === box.imageId), box, scale, 'cover'));
+        const overscanX = width * .02, overscanY = height * .02;
+        context.save(); context.filter = `blur(${state.canvas.ambientBlur * scale}px)`;
+        context.drawImage(backdrop, -overscanX, -overscanY, width + overscanX * 2, height + overscanY * 2); context.restore();
+      }
+      for (const box of state.computed.boxes) {
+        const image = state.images.find(item => item.id === box.imageId), dx = box.x * scale, dy = box.y * scale, dw = box.width * scale, dh = box.height * scale;
+        if (state.layout.cropMode === 'cover') drawProcessedImage(context, image, box, scale, 'cover');
+        else {
+          context.fillStyle = state.canvas.background; context.fillRect(dx, dy, dw, dh);
+          drawProcessedImage(context, image, box, scale, 'contain');
+        }
+      }
+      releaseAdjustmentProcessor();
+      return new Promise((resolve, reject) => {
+        try { canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('The browser could not create this export')), type, quality); }
+        catch (_) { reject(new Error('A remote image blocked export. Download it locally and add the file instead.')); }
+      });
+    }
+
+    function downloadBlob(blob, filename) {
+      const url = URL.createObjectURL(blob), link = document.createElement('a'); link.href = url; link.download = filename; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+    }
+
+    function openUrlDialog() { refs.urlDialog.showModal(); setTimeout(() => refs.urlInput.focus(), 0); }
+    function openExportDialog() {
+      refs.exportNote.textContent = `Export renders locally at ${state.canvas.width} × ${state.canvas.height} pixels.`;
+      refs.exportDialog.showModal();
+    }
+
+    let statusTimer = null;
+    function showQuickStatus(message, type = '') {
+      clearTimeout(statusTimer); refs.statusMessage.textContent = message; refs.statusMessage.className = `status-message${type ? ` ${type}` : ''}`;
+      statusTimer = setTimeout(renderStatus, 2600);
+    }
+    async function copyCollage(button = refs.copyBtn) {
+      const originalText = button.textContent; button.disabled = true; button.textContent = 'Copying…';
+      const blobPromise = exportCanvas('image/png', 1, 1);
+      try {
+        if (!navigator.clipboard?.write || typeof ClipboardItem === 'undefined') throw new Error('Clipboard image copying is not supported');
+        await navigator.clipboard.write([new ClipboardItem({ 'image/png': blobPromise })]);
+        state.errors = []; showQuickStatus('Collage copied to clipboard');
+      } catch (error) {
+        try {
+          const blob = await blobPromise; downloadBlob(blob, `collage-${state.canvas.width}x${state.canvas.height}.png`);
+          state.errors = [];
+          showQuickStatus('Clipboard unavailable · downloaded PNG instead', 'warning');
+        } catch (exportError) { state.errors = [exportError.message || error.message]; renderStatus(); }
+      } finally {
+        button.textContent = originalText;
+        button.disabled = button === refs.copyBtn ? !state.images.length || state.images.some(image => !image.exportSafe) : false;
+      }
+    }
+
+    refs.addBtn.addEventListener('click', () => refs.fileInput.click()); refs.chooseBtn.addEventListener('click', () => refs.fileInput.click());
+    refs.fileInput.addEventListener('change', () => { addItems(sortedFilePromises(refs.fileInput.files)); refs.fileInput.value = ''; });
+    refs.urlBtn.addEventListener('click', openUrlDialog); refs.emptyUrlBtn.addEventListener('click', openUrlDialog);
+    refs.loadUrlsBtn.addEventListener('click', event => { event.preventDefault(); const urls = refs.urlInput.value.split(/\r?\n/).map(v => v.trim()).filter(Boolean); if (urls.length) { refs.urlDialog.close(); refs.urlInput.value = ''; addItems(urls.map(imageFromUrl)); } });
+    refs.clearBtn.addEventListener('click', () => { if (confirm('Remove all photos from this collage?')) clearImages(); });
+    refs.shuffleBtn.addEventListener('click', () => { for (let i = state.images.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [state.images[i], state.images[j]] = [state.images[j], state.images[i]]; } recompute(); render(); });
+    refs.variationBtn.addEventListener('click', () => {
+      const variationCounts = { smart: 15, grid: 3, justified: 5, masonry: 3, 'binary-tree': 5 };
+      const count = state.layout.algorithm === 'smart' ? state.computed.variationCount || 1 : variationCounts[state.layout.algorithm];
+      state.layout.variation = (state.layout.variation + 1) % count;
+      recompute(); render();
+    });
+    refs.copyBtn.addEventListener('click', () => copyCollage());
+    refs.exportBtn.addEventListener('click', openExportDialog);
+
+    [refs.canvasW, refs.canvasH, refs.gap, refs.padding, refs.ambientBlur].forEach(input => input.addEventListener('input', scheduleSettings));
+    [refs.background, refs.gapFill, refs.cropMode].forEach(input => input.addEventListener('change', syncSettings));
+    refs.layoutMode.addEventListener('change', () => { state.layout.variation = 0; syncSettings(); });
+    refs.sizePreset.addEventListener('change', () => { if (refs.sizePreset.value !== 'custom') { const [width, height] = refs.sizePreset.value.split('x'); refs.canvasW.value = width; refs.canvasH.value = height; syncSettings(); } });
+
+    refs.trayList.addEventListener('click', event => {
+      const row = event.target.closest('.thumb-row'); if (!row) return; const index = state.images.findIndex(image => image.id === row.dataset.id), action = event.target.closest('button')?.dataset.action;
+      if (action === 'remove') removeImage(row.dataset.id);
+      else if (action === 'feature') { state.images[index].featured = !state.images[index].featured; recompute(); render(); }
+      else if (action === 'edit') { state.selectedId = row.dataset.id; refs.selectedTools.classList.add('mobile-open'); render(); }
+      else if (action === 'up') moveImage(index, index - 1);
+      else if (action === 'down') moveImage(index, index + 1);
+      else { state.selectedId = row.dataset.id; render(); }
+    });
+    refs.closeToolsBtn.addEventListener('click', () => refs.selectedTools.classList.remove('mobile-open'));
+    refs.trayList.addEventListener('keydown', event => { const row = event.target.closest('.thumb-row'); if (row && ['Enter', ' '].includes(event.key)) { event.preventDefault(); state.selectedId = row.dataset.id; render(); } });
+    refs.trayList.addEventListener('dragstart', event => { const row = event.target.closest('.thumb-row'); if (row) { state.dragId = row.dataset.id; event.dataTransfer.effectAllowed = 'move'; } });
+    refs.trayList.addEventListener('dragover', event => event.preventDefault());
+    refs.trayList.addEventListener('drop', event => { event.preventDefault(); const target = event.target.closest('.thumb-row'); if (state.dragId && target) moveImage(state.images.findIndex(image => image.id === state.dragId), state.images.findIndex(image => image.id === target.dataset.id)); state.dragId = null; });
+
+    function selectImage(id) {
+      if (state.selectedId === id) return;
+      state.selectedId = id;
+      refs.collage.querySelectorAll('.photo-box').forEach(node => node.classList.toggle('selected', node.dataset.id === id));
+      refs.trayList.querySelectorAll('.thumb-row').forEach(node => node.classList.toggle('selected', node.dataset.id === id));
+      const image = state.images.find(item => item.id === id); refs.selectedTools.hidden = !image; if (image) syncCropControls(image);
+    }
+
+    function refreshCrop(image, includeAmbient = true) { updateCropPreview(image, includeAmbient); syncCropControls(image); }
+    function resetCrop(image) { image.crop = defaultCrop(); finishCropRefresh(image); }
+
+    let cropRenderFrame = null, cropPendingImage = null, cropSettleTimer = null;
+    function scheduleCropRefresh(image) {
+      cropPendingImage = image;
+      if (cropRenderFrame === null) cropRenderFrame = requestAnimationFrame(() => {
+        cropRenderFrame = null;
+        if (cropPendingImage) refreshCrop(cropPendingImage, false);
+      });
+      clearTimeout(cropSettleTimer); cropSettleTimer = setTimeout(() => finishCropRefresh(image), 90);
+    }
+    function finishCropRefresh(image) {
+      clearTimeout(cropSettleTimer); cropSettleTimer = null;
+      if (cropRenderFrame !== null) { cancelAnimationFrame(cropRenderFrame); cropRenderFrame = null; }
+      cropPendingImage = null; refreshCrop(image, true); renderThumbnail(image);
+    }
+
+    function refreshAdjustments(image) {
+      updateCropPreview(image); syncCropControls(image);
+      renderThumbnail(image);
+      renderStatus();
+    }
+
+    let adjustmentFrame = null;
+    function scheduleAdjustmentRefresh(image) {
+      cancelAnimationFrame(adjustmentFrame);
+      adjustmentFrame = requestAnimationFrame(() => { adjustmentFrame = null; refreshAdjustments(image); });
+    }
+
+    function analyzeImage(image) {
+      const canvas = document.createElement('canvas'), size = 96; canvas.width = size; canvas.height = size;
+      const context = canvas.getContext('2d', { willReadFrequently: true });
+      context.drawImage(image.element, 0, 0, size, size);
+      const data = context.getImageData(0, 0, size, size).data;
+      let lumaSum = 0, lumaSquared = 0, saturationSum = 0, low = 0, high = 0, count = 0;
+      for (let index = 0; index < data.length; index += 4) {
+        if (data[index + 3] < 16) continue;
+        const red = data[index] / 255, green = data[index + 1] / 255, blue = data[index + 2] / 255;
+        const luma = red * .2126 + green * .7152 + blue * .0722, saturation = Math.max(red, green, blue) - Math.min(red, green, blue);
+        lumaSum += luma; lumaSquared += luma * luma; saturationSum += saturation; count++;
+        if (luma < .08) low++; if (luma > .92) high++;
+      }
+      if (!count) return defaultAdjustments();
+      const mean = lumaSum / count, deviation = Math.sqrt(Math.max(0, lumaSquared / count - mean * mean)), saturation = saturationSum / count;
+      return {
+        exposure: clamp(Math.round(Math.log2(.48 / Math.max(.04, mean)) * 50), -40, 40),
+        contrast: clamp(Math.round((.21 - deviation) * 180), -15, 35),
+        vibrance: clamp(Math.round((.38 - saturation) * 100), 0, 35),
+        highlights: high / count > .02 ? -clamp(Math.round((high / count - .02) * 180), 6, 30) : 0,
+        shadows: low / count > .03 ? clamp(Math.round((low / count - .03) * 180), 6, 30) : 0,
+        sharpness: 18
+      };
+    }
+
+    [refs.focalX, refs.focalY, refs.cropZoom].forEach(input => input.addEventListener('input', () => {
+      const image = state.images.find(item => item.id === state.selectedId); if (!image) return;
+      image.crop[input === refs.focalX ? 'focalX' : input === refs.focalY ? 'focalY' : 'zoom'] = Number(input.value);
+      scheduleCropRefresh(image);
+    }));
+    refs.resetCropBtn.addEventListener('click', () => { const image = state.images.find(item => item.id === state.selectedId); if (image) resetCrop(image); });
+    refs.adjustmentInputs.forEach(input => {
+      input.addEventListener('input', () => {
+        const image = state.images.find(item => item.id === state.selectedId); if (!image) return;
+        image.adjustments[input.dataset.adjustment] = Number(input.value); disposeImageCache(image);
+        input.nextElementSibling.textContent = input.value; refs.resetAdjustmentsBtn.disabled = !hasAdjustments(image);
+        scheduleAdjustmentRefresh(image);
+      });
+      input.addEventListener('dblclick', () => {
+        const image = state.images.find(item => item.id === state.selectedId); if (!image) return;
+        input.value = 0; image.adjustments[input.dataset.adjustment] = 0; disposeImageCache(image); refreshAdjustments(image);
+      });
+    });
+    refs.resetAdjustmentsBtn.addEventListener('click', () => {
+      const image = state.images.find(item => item.id === state.selectedId); if (!image) return;
+      image.adjustments = defaultAdjustments(); disposeImageCache(image); refreshAdjustments(image);
+    });
+    refs.autoEnhanceBtn.addEventListener('click', () => {
+      const image = state.images.find(item => item.id === state.selectedId); if (!image) return;
+      try { image.adjustments = analyzeImage(image); disposeImageCache(image); refreshAdjustments(image); showQuickStatus(`Auto enhanced ${image.fileName}`); }
+      catch (_) { showQuickStatus('This remote image cannot be analyzed because its host blocks pixel access', 'warning'); }
+    });
+    function setComparing(active) {
+      const image = state.images.find(item => item.id === state.selectedId); if (!image) return;
+      state.comparingId = active ? image.id : null; refs.compareBtn.classList.toggle('primary', active); refreshAdjustments(image);
+    }
+    refs.compareBtn.addEventListener('pointerdown', event => { event.preventDefault(); refs.compareBtn.setPointerCapture(event.pointerId); setComparing(true); });
+    ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(type => refs.compareBtn.addEventListener(type, () => setComparing(false)));
+    refs.compareBtn.addEventListener('keydown', event => { if ([' ', 'Enter'].includes(event.key) && !event.repeat) { event.preventDefault(); setComparing(true); } });
+    refs.compareBtn.addEventListener('keyup', event => { if ([' ', 'Enter'].includes(event.key)) { event.preventDefault(); setComparing(false); } });
+    refs.compareBtn.addEventListener('blur', () => setComparing(false));
+
+    let cropGesture = null;
+    const pointCenter = points => ({ x: points.reduce((sum, point) => sum + point.x, 0) / points.length, y: points.reduce((sum, point) => sum + point.y, 0) / points.length });
+    const pointDistance = points => points.length < 2 ? 1 : Math.max(1, Math.hypot(points[0].x - points[1].x, points[0].y - points[1].y));
+
+    function rebaseCropGesture() {
+      if (!cropGesture?.pointers.size) return;
+      const image = state.images.find(item => item.id === cropGesture.imageId), box = state.computed.boxes.find(item => item.imageId === cropGesture.imageId);
+      const points = [...cropGesture.pointers.values()];
+      Object.assign(cropGesture, {
+        startCrop: { ...image.crop }, startRect: getCoverCropRect(image, box), frameRect: cropGesture.node.getBoundingClientRect(),
+        startCenter: pointCenter(points), startDistance: pointDistance(points)
+      });
+    }
+
+    function updateCropGesture() {
+      const image = state.images.find(item => item.id === cropGesture?.imageId), box = state.computed.boxes.find(item => item.imageId === cropGesture?.imageId);
+      if (!image || !box || !cropGesture.pointers.size) return;
+      const points = [...cropGesture.pointers.values()], center = pointCenter(points);
+      const zoom = points.length > 1 ? clamp(cropGesture.startCrop.zoom * pointDistance(points) / cropGesture.startDistance, 1, 4) : cropGesture.startCrop.zoom;
+      const dimensions = getCoverCropRect(image, box, { focalX: .5, focalY: .5, zoom });
+      const sourceCenterX = cropGesture.startRect.sx + cropGesture.startRect.sw / 2 - (center.x - cropGesture.startCenter.x) / cropGesture.frameRect.width * cropGesture.startRect.sw;
+      const sourceCenterY = cropGesture.startRect.sy + cropGesture.startRect.sh / 2 - (center.y - cropGesture.startCenter.y) / cropGesture.frameRect.height * cropGesture.startRect.sh;
+      image.crop.zoom = zoom;
+      image.crop.focalX = dimensions.sw >= image.naturalWidth ? .5 : clamp((sourceCenterX - dimensions.sw / 2) / (image.naturalWidth - dimensions.sw), 0, 1);
+      image.crop.focalY = dimensions.sh >= image.naturalHeight ? .5 : clamp((sourceCenterY - dimensions.sh / 2) / (image.naturalHeight - dimensions.sh), 0, 1);
+      scheduleCropRefresh(image);
+    }
+
+    refs.collage.addEventListener('pointerdown', event => {
+      const node = event.target.closest('.photo-box'); if (!node) return;
+      selectImage(node.dataset.id); node.focus({ preventScroll: true });
+      if (state.layout.cropMode !== 'cover') return;
+      event.preventDefault(); node.setPointerCapture(event.pointerId); node.classList.add('dragging');
+      if (!cropGesture || cropGesture.imageId !== node.dataset.id) cropGesture = { imageId: node.dataset.id, node, pointers: new Map() };
+      cropGesture.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY }); rebaseCropGesture();
+    });
+    refs.collage.addEventListener('focusin', event => { const node = event.target.closest('.photo-box'); if (node) selectImage(node.dataset.id); });
+    refs.collage.addEventListener('pointermove', event => {
+      if (!cropGesture?.pointers.has(event.pointerId)) return;
+      event.preventDefault(); cropGesture.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY }); updateCropGesture();
+    });
+    function endCropPointer(event) {
+      if (!cropGesture?.pointers.has(event.pointerId)) return;
+      const image = state.images.find(item => item.id === cropGesture.imageId);
+      cropGesture.pointers.delete(event.pointerId);
+      if (cropGesture.pointers.size) rebaseCropGesture();
+      else { cropGesture.node.classList.remove('dragging'); cropGesture = null; if (image) finishCropRefresh(image); }
+    }
+    refs.collage.addEventListener('pointerup', endCropPointer);
+    refs.collage.addEventListener('pointercancel', endCropPointer);
+    refs.collage.addEventListener('dblclick', event => {
+      const node = event.target.closest('.photo-box'), image = node && state.images.find(item => item.id === node.dataset.id);
+      if (image && state.layout.cropMode === 'cover') { event.preventDefault(); resetCrop(image); }
+    });
+    refs.collage.addEventListener('wheel', event => {
+      const node = event.target.closest('.photo-box'), image = node && state.images.find(item => item.id === node.dataset.id);
+      if (!image || state.layout.cropMode !== 'cover') return;
+      event.preventDefault(); selectImage(image.id);
+      image.crop.zoom = clamp(image.crop.zoom * Math.exp(-event.deltaY * .0015), 1, 4); scheduleCropRefresh(image);
+    }, { passive: false });
+    refs.collage.addEventListener('keydown', event => {
+      const node = event.target.closest('.photo-box'), image = node && state.images.find(item => item.id === node.dataset.id);
+      if (!image) return; selectImage(image.id);
+      if (state.layout.cropMode !== 'cover') return;
+      const step = event.shiftKey ? .1 : .025, key = event.key;
+      if (key === 'ArrowLeft') image.crop.focalX = clamp(image.crop.focalX - step, 0, 1);
+      else if (key === 'ArrowRight') image.crop.focalX = clamp(image.crop.focalX + step, 0, 1);
+      else if (key === 'ArrowUp') image.crop.focalY = clamp(image.crop.focalY - step, 0, 1);
+      else if (key === 'ArrowDown') image.crop.focalY = clamp(image.crop.focalY + step, 0, 1);
+      else if (['+', '='].includes(key)) image.crop.zoom = clamp(image.crop.zoom + .1, 1, 4);
+      else if (['-', '_'].includes(key)) image.crop.zoom = clamp(image.crop.zoom - .1, 1, 4);
+      else if (key === '0') { event.preventDefault(); resetCrop(image); return; }
+      else return;
+      event.preventDefault(); scheduleCropRefresh(image);
+    });
+
+    function resizeLayout(handle, sourceBoxes, requestedDelta) {
+      const before = handle.beforeIds, after = handle.afterIds, sizeKey = handle.orientation === 'vertical' ? 'width' : 'height';
+      const involved = sourceBoxes.filter(box => before.has(box.imageId) || after.has(box.imageId));
+      const minSize = Math.min(40, ...involved.map(box => box[sizeKey]));
+      const minDelta = Math.max(...sourceBoxes.filter(box => before.has(box.imageId)).map(box => minSize - box[sizeKey]));
+      const maxDelta = Math.min(...sourceBoxes.filter(box => after.has(box.imageId)).map(box => box[sizeKey] - minSize));
+      const delta = clamp(requestedDelta, minDelta, maxDelta);
+      const boxes = sourceBoxes.map(box => {
+        const resized = { ...box };
+        if (before.has(box.imageId)) resized[sizeKey] += delta;
+        if (after.has(box.imageId)) {
+          if (handle.orientation === 'vertical') resized.x += delta; else resized.y += delta;
+          resized[sizeKey] -= delta;
+        }
+        return resized;
+      });
+      return { boxes, delta };
+    }
+
+    function updateLayoutPreview(boxes) {
+      state.computed.boxes = boxes;
+      boxes.forEach(box => {
+        const image = state.images.find(item => item.id === box.imageId);
+        refs.collage.querySelectorAll(`[data-image-id="${CSS.escape(box.imageId)}"]`).forEach(node => {
+          Object.assign(node.style, { left: `${box.x}px`, top: `${box.y}px`, width: `${box.width}px`, height: `${box.height}px` });
+          const media = node.querySelector('img, canvas'), mode = node.classList.contains('ambient-photo') ? 'cover' : state.layout.cropMode;
+          if (media?.tagName === 'CANVAS') renderImageCanvas(media, image, box, mode, previewPixelScale(), effectiveAdjustments(image));
+          else if (media) applyImageCrop(media, image, box, mode);
+        });
+      });
+    }
+
+    function saveManualLayout() {
+      state.layout.manual = { signature: layoutSignature(), boxes: state.computed.boxes.map(box => ({ ...box })) };
+      state.computed.manual = true; render();
+    }
+
+    function resetManualLayout() { state.layout.manual = null; recompute(); render(); }
+
+    let layoutGesture = null;
+    refs.collage.addEventListener('pointerdown', event => {
+      const node = event.target.closest('.layout-handle'); if (!node) return;
+      const handle = layoutHandles[Number(node.dataset.handleIndex)]; if (!handle) return;
+      event.preventDefault(); node.setPointerCapture(event.pointerId); node.classList.add('dragging');
+      layoutGesture = {
+        pointerId: event.pointerId, node, handle, start: handle.orientation === 'vertical' ? event.clientX : event.clientY,
+        sourceBoxes: state.computed.boxes.map(box => ({ ...box })), delta: 0
+      };
+    });
+    refs.collage.addEventListener('pointermove', event => {
+      if (!layoutGesture || event.pointerId !== layoutGesture.pointerId) return;
+      event.preventDefault();
+      const position = layoutGesture.handle.orientation === 'vertical' ? event.clientX : event.clientY;
+      const result = resizeLayout(layoutGesture.handle, layoutGesture.sourceBoxes, (position - layoutGesture.start) / getPreviewScale());
+      layoutGesture.delta = result.delta; updateLayoutPreview(result.boxes);
+      const hitSize = 14 / getPreviewScale(), coord = layoutGesture.handle.coord + result.delta;
+      if (layoutGesture.handle.orientation === 'vertical') layoutGesture.node.style.left = `${coord - hitSize / 2}px`;
+      else layoutGesture.node.style.top = `${coord - hitSize / 2}px`;
+    });
+    function endLayoutPointer(event) {
+      if (!layoutGesture || event.pointerId !== layoutGesture.pointerId) return;
+      layoutGesture.node.classList.remove('dragging');
+      const changed = Math.abs(layoutGesture.delta) > .01; layoutGesture = null;
+      if (changed) saveManualLayout();
+    }
+    refs.collage.addEventListener('pointerup', endLayoutPointer);
+    refs.collage.addEventListener('pointercancel', endLayoutPointer);
+    refs.collage.addEventListener('dblclick', event => { if (event.target.closest('.layout-handle')) { event.preventDefault(); resetManualLayout(); } });
+    refs.collage.addEventListener('keydown', event => {
+      const node = event.target.closest('.layout-handle'); if (!node) return;
+      const index = Number(node.dataset.handleIndex), handle = layoutHandles[index]; if (!handle) return;
+      const direction = handle.orientation === 'vertical' ? ({ ArrowLeft: -1, ArrowRight: 1 })[event.key] : ({ ArrowUp: -1, ArrowDown: 1 })[event.key];
+      if (!direction) return;
+      event.preventDefault();
+      const result = resizeLayout(handle, state.computed.boxes, direction * (event.shiftKey ? 25 : 10));
+      if (Math.abs(result.delta) <= .01) return;
+      updateLayoutPreview(result.boxes); saveManualLayout();
+      requestAnimationFrame(() => refs.collage.querySelector(`.layout-handle[data-handle-index="${index}"]`)?.focus());
+    });
+    refs.resetLayoutBtn.addEventListener('click', resetManualLayout);
+
+    let dragDepth = 0;
+    window.addEventListener('dragover', event => event.preventDefault());
+    window.addEventListener('drop', event => event.preventDefault());
+    refs.previewWrap.addEventListener('dragenter', event => { event.preventDefault(); dragDepth++; refs.previewWrap.classList.add('dragging'); });
+    refs.previewWrap.addEventListener('dragleave', () => { dragDepth = Math.max(0, dragDepth - 1); if (!dragDepth) refs.previewWrap.classList.remove('dragging'); });
+    refs.previewWrap.addEventListener('drop', event => {
+      dragDepth = 0; refs.previewWrap.classList.remove('dragging');
+      const files = [...event.dataTransfer.files].filter(file => file.type.startsWith('image/'));
+      if (files.length) addItems(sortedFilePromises(files));
+      else { const text = event.dataTransfer.getData('text/uri-list') || event.dataTransfer.getData('text/plain'); const urls = text.split(/\r?\n/).map(v => v.trim()).filter(v => /^https?:\/\//i.test(v)); if (urls.length) addItems(urls.map(imageFromUrl)); }
+    });
+    document.addEventListener('paste', event => {
+      if (refs.urlDialog.open || ['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+      const files = [...event.clipboardData.items].filter(item => item.type.startsWith('image/')).map(item => item.getAsFile()).filter(Boolean);
+      if (files.length) { event.preventDefault(); addItems(sortedFilePromises(files, 'clipboard')); return; }
+      const text = event.clipboardData.getData('text/plain'); const urls = text.split(/\r?\n/).map(v => v.trim()).filter(v => /^https?:\/\//i.test(v));
+      if (urls.length) { event.preventDefault(); addItems(urls.map(imageFromUrl)); }
+    });
+
+    refs.exportFormat.addEventListener('change', () => { refs.qualityRow.hidden = !['image/jpeg', 'image/webp'].includes(refs.exportFormat.value); });
+    refs.exportQuality.addEventListener('input', () => refs.qualityValue.textContent = `${Math.round(refs.exportQuality.value * 100)}%`);
+    refs.exportScale.addEventListener('change', () => { const scale = Number(refs.exportScale.value); refs.exportNote.textContent = `Export renders locally at ${Math.round(state.canvas.width * scale)} × ${Math.round(state.canvas.height * scale)} pixels.`; });
+    refs.downloadBtn.addEventListener('click', async event => {
+      event.preventDefault(); refs.downloadBtn.disabled = true; refs.downloadBtn.textContent = 'Rendering…';
+      try {
+        const format = refs.exportFormat.value, scale = Number(refs.exportScale.value);
+        const blob = await exportCanvas(format, Number(refs.exportQuality.value), scale);
+        const extension = ({ 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' })[format];
+        downloadBlob(blob, `collage-${state.canvas.width}x${state.canvas.height}.${extension}`); refs.exportDialog.close(); state.errors = []; renderStatus();
+      } catch (error) { state.errors = [error.message]; refs.exportDialog.close(); renderStatus(); }
+      finally { refs.downloadBtn.disabled = false; refs.downloadBtn.textContent = 'Download'; }
+    });
+
+    new ResizeObserver(() => renderPreview()).observe(refs.previewWrap);
+    window.addEventListener('beforeunload', () => {
+      state.images.forEach(image => { disposeImageCache(image); if (image.objectUrl) URL.revokeObjectURL(image.src); });
+      releaseAdjustmentProcessor();
+    });
+    recompute(); render();
+  </script>
+</body>
+</html>
