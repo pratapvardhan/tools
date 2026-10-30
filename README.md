@@ -14,6 +14,7 @@ Some built with LLM assistance.
 - [CSV Merge](csv-merge/) - merge multiple CSV files.
 - [Local PDF](local-pdf/) - edit, merge, split, sign, crop, watermark, etc PDF files in your browser.
 - [Notepad](notepad/) - using local storage, no tracking.
+- [Canvas](canvas/) - infinite whiteboard with shapes, arrows, pen, stickies and images, saved in your browser.
 - [Timezones](timezones/) - track time in multiple timezones.
 - [Currency Converter](currency-converter/) - convert currencies.
 - [Nifty Returns](nifty-returns/) - monthly returns heatmap for Nifty indices.
